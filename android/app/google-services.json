@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "294561693486",
+    "project_id": "trackwwell",
+    "storage_bucket": "trackwwell.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:294561693486:android:cee0669724ca4e968084bf",
+        "android_client_info": {
+          "package_name": "com.example.trackwell"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDmfGJeAwPClVxzK7YNtOtpRS81HAfnZ7M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
