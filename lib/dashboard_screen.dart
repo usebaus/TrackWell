@@ -9,6 +9,38 @@ import 'medication_tracker_screen.dart';
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({Key? key}) : super(key: key);
 
+  Future<void> _logout(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Log Out',
+            style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
+        content: const Text('Are you sure you want to log out?',
+            style: TextStyle(color: AppTheme.textMuted)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel', style: TextStyle(color: AppTheme.textMuted)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              minimumSize: const Size(80, 38),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Log Out'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      await FirebaseAuth.instance.signOut();
+      Navigator.pushReplacementNamed(context, '/login');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -25,16 +57,12 @@ class DashboardScreen extends StatelessWidget {
           onPressed: () {},
         ),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: CircleAvatar(
-              radius: 18,
-              backgroundColor: AppTheme.primaryLight,
-              child: Text(name[0].toUpperCase(),
-                  style: const TextStyle(color: AppTheme.primary,
-                      fontWeight: FontWeight.bold)),
-            ),
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.red),
+            tooltip: 'Log Out',
+            onPressed: () => _logout(context),
           ),
+          const SizedBox(width: 4),
         ],
       ),
       body: SingleChildScrollView(
@@ -61,15 +89,17 @@ class DashboardScreen extends StatelessWidget {
                             fontSize: 20, fontWeight: FontWeight.bold)),
                   ),
                   const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Good morning, $name',
-                          style: const TextStyle(fontWeight: FontWeight.w600,
-                              fontSize: 16, color: AppTheme.textPrimary)),
-                      const Text("You're 65% towards today's goals",
-                          style: TextStyle(color: AppTheme.textMuted, fontSize: 13)),
-                    ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Good morning, $name',
+                            style: const TextStyle(fontWeight: FontWeight.w600,
+                                fontSize: 16, color: AppTheme.textPrimary)),
+                        const Text("You're 65% towards today's goals",
+                            style: TextStyle(color: AppTheme.textMuted, fontSize: 13)),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -88,13 +118,11 @@ class DashboardScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 24),
-            // Tracker sections
             _sectionHeader('💧 Water', 'Today'),
             const SizedBox(height: 10),
-            _trackerCard(
-              context,
+            _trackerCard(context,
               icon: Icons.water_drop_outlined,
-              title: 'Water Intake',
+              title: 'Water Tracker',
               subtitle: 'Track your daily hydration',
               onTap: () => Navigator.push(context,
                   MaterialPageRoute(builder: (_) => const WaterTrackerScreen())),
@@ -102,8 +130,7 @@ class DashboardScreen extends StatelessWidget {
             const SizedBox(height: 20),
             _sectionHeader('🍽 Meals', 'Today'),
             const SizedBox(height: 10),
-            _trackerCard(
-              context,
+            _trackerCard(context,
               icon: Icons.restaurant_outlined,
               title: 'Meal Tracker',
               subtitle: 'Log your food intake',
@@ -113,8 +140,7 @@ class DashboardScreen extends StatelessWidget {
             const SizedBox(height: 20),
             _sectionHeader('🏃 Exercise', 'Today'),
             const SizedBox(height: 10),
-            _trackerCard(
-              context,
+            _trackerCard(context,
               icon: Icons.fitness_center_outlined,
               title: 'Exercise Tracker',
               subtitle: 'Log your workouts',
@@ -134,8 +160,7 @@ class DashboardScreen extends StatelessWidget {
             const SizedBox(height: 20),
             _sectionHeader('💊 Medication', 'Today'),
             const SizedBox(height: 10),
-            _trackerCard(
-              context,
+            _trackerCard(context,
               icon: Icons.medication_outlined,
               title: 'Medication Tracker',
               subtitle: 'Track your medications',
@@ -186,10 +211,8 @@ class DashboardScreen extends StatelessWidget {
   }
 
   Widget _trackerCard(BuildContext context,
-      {required IconData icon,
-      required String title,
-      required String subtitle,
-      required VoidCallback onTap}) {
+      {required IconData icon, required String title,
+       required String subtitle, required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
