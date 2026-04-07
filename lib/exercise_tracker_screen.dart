@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'app_theme.dart';
 
 class ExerciseTrackerScreen extends StatefulWidget {
   const ExerciseTrackerScreen({Key? key}) : super(key: key);
+
   @override
   _ExerciseTrackerScreenState createState() => _ExerciseTrackerScreenState();
 }
@@ -16,76 +18,95 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
 
   String _selectedActivity = 'Run';
   String _selectedIntensity = 'Medium';
-  int _totalMinutes = 0;
-  int _totalCalories = 0;
-  double _totalDistance = 0;
-  List<Map<String, String>> _history = [];
 
   final List<String> _quickActivities = ['Run', 'Walk', 'Cycle', 'Swim', 'Strength'];
   final List<String> _intensities = ['Low', 'Medium', 'High'];
 
-  @override
-  void initState() {
-    super.initState();
-    _loadData();
-  }
+  String get _uid => FirebaseAuth.instance.currentUser!.uid;
 
-  Future<void> _loadData() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _totalMinutes = prefs.getInt('ex_minutes') ?? 0;
-      _totalCalories = prefs.getInt('ex_calories') ?? 0;
-      _totalDistance = prefs.getDouble('ex_distance') ?? 0;
-      final historyRaw = prefs.getStringList('ex_history') ?? [];
-      _history = historyRaw.map((e) {
-        final parts = e.split('|');
-        return {
-          'activity': parts[0],
-          'detail': parts[1],
-          'time': parts[2],
-        };
-      }).toList();
-    });
-  }
+  CollectionReference get _exercisesCol => FirebaseFirestore.instance
+      .collection('users')
+      .doc(_uid)
+      .collection('exercises');
+
+  String get _today => DateTime.now().toIso8601String().substring(0, 10);
+  DocumentReference get _totalsDoc => FirebaseFirestore.instance
+      .collection('users')
+      .doc(_uid)
+      .collection('exercise_totals')
+      .doc(_today);
 
   Future<void> _logActivity() async {
     final mins = int.tryParse(_durationController.text) ?? 0;
     final cals = int.tryParse(_caloriesController.text) ?? 0;
-    final dist = double.tryParse(_distanceController.text) ?? 0;
+    final dist = double.tryParse(_distanceController.text) ?? 0.0;
 
     if (mins == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter duration')));
+        const SnackBar(content: Text('Please enter duration')),
+      );
       return;
     }
 
-    final prefs = await SharedPreferences.getInstance();
-    final newMins = _totalMinutes + mins;
-    final newCals = _totalCalories + cals;
-    final newDist = _totalDistance + dist;
+    try {
+      await _exercisesCol.add({
+        'activity': _selectedActivity,
+        'intensity': _selectedIntensity,
+        'duration_mins': mins,
+        'calories': cals,
+        'distance_km': dist,
+        'notes': _notesController.text.trim(),
+        'created_at': FieldValue.serverTimestamp(),
+      });
 
-    final entry = '$_selectedActivity|$dist km • $mins min • $cals kcal|Today';
-    final historyRaw = prefs.getStringList('ex_history') ?? [];
-    historyRaw.insert(0, entry);
+      await _totalsDoc.set({
+        'total_minutes': FieldValue.increment(mins),
+        'total_calories': FieldValue.increment(cals),
+        'total_distance': FieldValue.increment(dist),
+        'updated_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
 
-    await prefs.setInt('ex_minutes', newMins);
-    await prefs.setInt('ex_calories', newCals);
-    await prefs.setDouble('ex_distance', newDist);
-    await prefs.setStringList('ex_history', historyRaw);
+      _durationController.clear();
+      _caloriesController.clear();
+      _distanceController.clear();
+      _notesController.clear();
 
-    _durationController.clear();
-    _caloriesController.clear();
-    _distanceController.clear();
-    _notesController.clear();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Activity logged!'),
+            backgroundColor: AppTheme.primary,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to log activity. Please try again.')),
+        );
+      }
+    }
+  }
 
-    await _loadData();
+  Future<void> _deleteEntry(String docId) async {
+    try {
+      await _exercisesCol.doc(docId).delete();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to delete entry.')),
+        );
+      }
+    }
+  }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Activity logged!'),
-        backgroundColor: AppTheme.primary,
-      ),
-    );
+  @override
+  void dispose() {
+    _durationController.dispose();
+    _caloriesController.dispose();
+    _distanceController.dispose();
+    _notesController.dispose();
+    super.dispose();
   }
 
   @override
@@ -96,7 +117,9 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
         title: const Text('Log Exercise'),
         leading: IconButton(
           icon: const Icon(Icons.settings_outlined),
-          onPressed: () {},
+          onPressed: () {
+            Navigator.pushNamed(context, '/settings');
+          },
         ),
         actions: [
           IconButton(
@@ -111,9 +134,15 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 16),
-            const Text('Quick Add',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500,
-                    color: AppTheme.textMuted)),
+
+            const Text(
+              'Quick Add',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: AppTheme.textMuted,
+              ),
+            ),
             const SizedBox(height: 10),
             Wrap(
               spacing: 8,
@@ -127,21 +156,32 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
                       color: selected ? AppTheme.primary : Colors.white,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                          color: selected ? AppTheme.primary : AppTheme.border),
+                        color: selected ? AppTheme.primary : AppTheme.border,
+                      ),
                     ),
-                    child: Text(a,
-                        style: TextStyle(
-                          color: selected ? Colors.white : AppTheme.textPrimary,
-                          fontWeight: FontWeight.w500, fontSize: 14,
-                        )),
+                    child: Text(
+                      a,
+                      style: TextStyle(
+                        color: selected ? Colors.white : AppTheme.textPrimary,
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                      ),
+                    ),
                   ),
                 );
               }).toList(),
             ),
+
             const SizedBox(height: 24),
-            const Text('Details',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500,
-                    color: AppTheme.textMuted)),
+
+            const Text(
+              'Details',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: AppTheme.textMuted,
+              ),
+            ),
             const SizedBox(height: 10),
             Container(
               padding: const EdgeInsets.all(16),
@@ -156,13 +196,26 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(_selectedActivity,
-                            style: const TextStyle(fontWeight: FontWeight.w600,
-                                fontSize: 16, color: AppTheme.textPrimary)),
-                        const Text('Type of exercise',
-                            style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
-                      ]),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _selectedActivity,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                          const Text(
+                            'Type of exercise',
+                            style: TextStyle(
+                              color: AppTheme.textMuted,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                         decoration: BoxDecoration(
@@ -171,12 +224,20 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
                         ),
                         child: const Row(
                           children: [
-                            Icon(Icons.monitor_heart_outlined,
-                                color: AppTheme.primary, size: 14),
+                            Icon(
+                              Icons.monitor_heart_outlined,
+                              color: AppTheme.primary,
+                              size: 14,
+                            ),
                             SizedBox(width: 4),
-                            Text('Select',
-                                style: TextStyle(color: AppTheme.primary,
-                                    fontWeight: FontWeight.w500, fontSize: 13)),
+                            Text(
+                              'Select',
+                              style: TextStyle(
+                                color: AppTheme.primary,
+                                fontWeight: FontWeight.w500,
+                                fontSize: 13,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -191,7 +252,10 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
                           keyboardType: TextInputType.number,
                           decoration: const InputDecoration(
                             hintText: 'Duration (min)',
-                            hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                            hintStyle: TextStyle(
+                              color: AppTheme.textMuted,
+                              fontSize: 13,
+                            ),
                           ),
                         ),
                       ),
@@ -202,7 +266,10 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
                           keyboardType: TextInputType.number,
                           decoration: const InputDecoration(
                             hintText: 'Calories (kcal)',
-                            hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                            hintStyle: TextStyle(
+                              color: AppTheme.textMuted,
+                              fontSize: 13,
+                            ),
                           ),
                         ),
                       ),
@@ -217,7 +284,10 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
                           keyboardType: TextInputType.number,
                           decoration: const InputDecoration(
                             hintText: 'Distance (km)',
-                            hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                            hintStyle: TextStyle(
+                              color: AppTheme.textMuted,
+                              fontSize: 13,
+                            ),
                           ),
                         ),
                       ),
@@ -226,7 +296,10 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
                         child: TextField(
                           decoration: InputDecoration(
                             hintText: 'Heart Rate (avg)',
-                            hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                            hintStyle: TextStyle(
+                              color: AppTheme.textMuted,
+                              fontSize: 13,
+                            ),
                           ),
                         ),
                       ),
@@ -239,11 +312,20 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
                       const Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Intensity',
-                              style: TextStyle(fontWeight: FontWeight.w600,
-                                  color: AppTheme.textPrimary)),
-                          Text('How hard was it?',
-                              style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+                          Text(
+                            'Intensity',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                          Text(
+                            'How hard was it?',
+                            style: TextStyle(
+                              color: AppTheme.textMuted,
+                              fontSize: 12,
+                            ),
+                          ),
                         ],
                       ),
                       Row(
@@ -258,11 +340,14 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
                                 color: sel ? AppTheme.primary : AppTheme.primaryLight,
                                 borderRadius: BorderRadius.circular(16),
                               ),
-                              child: Text(i,
-                                  style: TextStyle(
-                                    color: sel ? Colors.white : AppTheme.primary,
-                                    fontSize: 12, fontWeight: FontWeight.w500,
-                                  )),
+                              child: Text(
+                                i,
+                                style: TextStyle(
+                                  color: sel ? Colors.white : AppTheme.primary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                             ),
                           );
                         }).toList(),
@@ -281,36 +366,107 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
                 ],
               ),
             ),
+
             const SizedBox(height: 20),
             ElevatedButton.icon(
               onPressed: _logActivity,
               icon: const Icon(Icons.add, size: 18),
               label: const Text('Log Activity'),
             ),
+
             const SizedBox(height: 24),
-            const Text("Today's Progress",
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500,
-                    color: AppTheme.textMuted)),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                _progressChip(Icons.timer_outlined, '$_totalMinutes min', 'Duration'),
-                const SizedBox(width: 10),
-                _progressChip(Icons.local_fire_department_outlined,
-                    '$_totalCalories kcal', 'Calories'),
-                const SizedBox(width: 10),
-                _progressChip(Icons.map_outlined,
-                    '${_totalDistance.toStringAsFixed(1)} km', 'Distance'),
-              ],
+
+            const Text(
+              "Today's Progress",
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: AppTheme.textMuted,
+              ),
             ),
-            if (_history.isNotEmpty) ...[
-              const SizedBox(height: 24),
-              const Text('History',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500,
-                      color: AppTheme.textMuted)),
-              const SizedBox(height: 10),
-              ..._history.take(5).map((h) => _historyItem(h)),
-            ],
+            const SizedBox(height: 10),
+            StreamBuilder<DocumentSnapshot>(
+              stream: _totalsDoc.snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final data = snapshot.data?.data() as Map<String, dynamic>?;
+                final totalMins = data?['total_minutes'] as int? ?? 0;
+                final totalCals = data?['total_calories'] as int? ?? 0;
+                final totalDist = (data?['total_distance'] as num?)?.toDouble() ?? 0.0;
+                return Row(
+                  children: [
+                    _progressChip(Icons.timer_outlined, '$totalMins min', 'Duration'),
+                    const SizedBox(width: 10),
+                    _progressChip(
+                      Icons.local_fire_department_outlined,
+                      '$totalCals kcal',
+                      'Calories',
+                    ),
+                    const SizedBox(width: 10),
+                    _progressChip(
+                      Icons.map_outlined,
+                      '${totalDist.toStringAsFixed(1)} km',
+                      'Distance',
+                    ),
+                  ],
+                );
+              },
+            ),
+
+            const SizedBox(height: 24),
+
+            const Text(
+              'History',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: AppTheme.textMuted,
+              ),
+            ),
+            const SizedBox(height: 10),
+            StreamBuilder<QuerySnapshot>(
+              stream: _exercisesCol
+                  .orderBy('created_at', descending: true)
+                  .limit(5)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return const Center(child: Text('Error loading history.'));
+                }
+                final docs = snapshot.data?.docs ?? [];
+                if (docs.isEmpty) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Text(
+                        'No activities logged yet.',
+                        style: TextStyle(color: AppTheme.textMuted),
+                      ),
+                    ),
+                  );
+                }
+                return Column(
+                  children: docs.map((doc) {
+                    final d = doc.data() as Map<String, dynamic>;
+                    final activity = d['activity'] as String? ?? '';
+                    final dist = (d['distance_km'] as num?)?.toDouble() ?? 0.0;
+                    final mins = d['duration_mins'] as int? ?? 0;
+                    final cals = d['calories'] as int? ?? 0;
+                    return _historyItem(
+                      docId: doc.id,
+                      activity: activity,
+                      detail: '${dist.toStringAsFixed(1)} km • $mins min • $cals kcal',
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+
             const SizedBox(height: 32),
           ],
         ),
@@ -331,18 +487,32 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
           children: [
             Icon(icon, color: AppTheme.primary, size: 22),
             const SizedBox(height: 6),
-            Text(value,
-                style: const TextStyle(fontWeight: FontWeight.bold,
-                    fontSize: 15, color: AppTheme.textPrimary)),
-            Text(label,
-                style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+            Text(
+              value,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+                color: AppTheme.textPrimary,
+              ),
+            ),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppTheme.textMuted,
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _historyItem(Map<String, String> h) {
+  Widget _historyItem({
+    required String docId,
+    required String activity,
+    required String detail,
+  }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -359,23 +529,43 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
               color: AppTheme.primaryLight,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.fitness_center_outlined,
-                color: AppTheme.primary, size: 18),
+            child: const Icon(
+              Icons.fitness_center_outlined,
+              color: AppTheme.primary,
+              size: 18,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(h['activity'] ?? '',
-                    style: const TextStyle(fontWeight: FontWeight.w600,
-                        fontSize: 14, color: AppTheme.textPrimary)),
-                Text(h['detail'] ?? '',
-                    style: const TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                Text(
+                  activity,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+                Text(
+                  detail,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textMuted,
+                  ),
+                ),
               ],
             ),
           ),
-          const Icon(Icons.chevron_right, color: AppTheme.textMuted),
+          IconButton(
+            icon: const Icon(
+              Icons.delete_outline,
+              color: AppTheme.textMuted,
+              size: 20,
+            ),
+            onPressed: () => _deleteEntry(docId),
+          ),
         ],
       ),
     );

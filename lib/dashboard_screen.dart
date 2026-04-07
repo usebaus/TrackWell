@@ -52,10 +52,14 @@ class DashboardScreen extends StatelessWidget {
         backgroundColor: AppTheme.background,
         title: const Text('TrackWell',
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+
         leading: IconButton(
           icon: const Icon(Icons.settings_outlined),
-          onPressed: () {},
+          onPressed: () {
+            Navigator.pushNamed(context, '/settings'); // FIX burada
+          },
         ),
+
         actions: [
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.red),
@@ -65,13 +69,14 @@ class DashboardScreen extends StatelessWidget {
           const SizedBox(width: 4),
         ],
       ),
+
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 8),
-            // Greeting card
+
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -85,8 +90,10 @@ class DashboardScreen extends StatelessWidget {
                     radius: 24,
                     backgroundColor: AppTheme.primaryLight,
                     child: Text(name[0].toUpperCase(),
-                        style: const TextStyle(color: AppTheme.primary,
-                            fontSize: 20, fontWeight: FontWeight.bold)),
+                        style: const TextStyle(
+                            color: AppTheme.primary,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold)),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -94,18 +101,22 @@ class DashboardScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Good morning, $name',
-                            style: const TextStyle(fontWeight: FontWeight.w600,
-                                fontSize: 16, color: AppTheme.textPrimary)),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
+                                color: AppTheme.textPrimary)),
                         const Text("You're 65% towards today's goals",
-                            style: TextStyle(color: AppTheme.textMuted, fontSize: 13)),
+                            style: TextStyle(
+                                color: AppTheme.textMuted, fontSize: 13)),
                       ],
                     ),
                   ),
                 ],
               ),
             ),
+
             const SizedBox(height: 16),
-            // Stats row
+
             Row(
               children: [
                 _statChip('1.2L', 'Water'),
@@ -117,7 +128,9 @@ class DashboardScreen extends StatelessWidget {
                 _statChip('0', 'Meds'),
               ],
             ),
+
             const SizedBox(height: 24),
+
             _sectionHeader('💧 Water', 'Today'),
             const SizedBox(height: 10),
             _trackerCard(context,
@@ -127,7 +140,9 @@ class DashboardScreen extends StatelessWidget {
               onTap: () => Navigator.push(context,
                   MaterialPageRoute(builder: (_) => const WaterTrackerScreen())),
             ),
+
             const SizedBox(height: 20),
+
             _sectionHeader('🍽 Meals', 'Today'),
             const SizedBox(height: 10),
             _trackerCard(context,
@@ -137,7 +152,9 @@ class DashboardScreen extends StatelessWidget {
               onTap: () => Navigator.push(context,
                   MaterialPageRoute(builder: (_) => const MealTrackerScreen())),
             ),
+
             const SizedBox(height: 20),
+
             _sectionHeader('🏃 Exercise', 'Today'),
             const SizedBox(height: 10),
             _trackerCard(context,
@@ -147,7 +164,9 @@ class DashboardScreen extends StatelessWidget {
               onTap: () => Navigator.push(context,
                   MaterialPageRoute(builder: (_) => const ExerciseTrackerScreen())),
             ),
+
             const SizedBox(height: 12),
+
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
@@ -157,7 +176,9 @@ class DashboardScreen extends StatelessWidget {
                 label: const Text('Add Activity'),
               ),
             ),
+
             const SizedBox(height: 20),
+
             _sectionHeader('💊 Medication', 'Today'),
             const SizedBox(height: 10),
             _trackerCard(context,
@@ -167,6 +188,7 @@ class DashboardScreen extends StatelessWidget {
               onTap: () => Navigator.push(context,
                   MaterialPageRoute(builder: (_) => const MedicationTrackerScreen())),
             ),
+
             const SizedBox(height: 32),
           ],
         ),
@@ -186,11 +208,14 @@ class DashboardScreen extends StatelessWidget {
         child: Column(
           children: [
             Text(value,
-                style: const TextStyle(fontWeight: FontWeight.bold,
-                    fontSize: 15, color: AppTheme.textPrimary)),
+                style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color: AppTheme.textPrimary)),
             const SizedBox(height: 2),
             Text(label,
-                style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                style: const TextStyle(
+                    fontSize: 11, color: AppTheme.textMuted)),
           ],
         ),
       ),
@@ -202,17 +227,22 @@ class DashboardScreen extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(title,
-            style: const TextStyle(fontWeight: FontWeight.w600,
-                fontSize: 16, color: AppTheme.textPrimary)),
+            style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 16,
+                color: AppTheme.textPrimary)),
         Text(sub,
-            style: const TextStyle(fontSize: 13, color: AppTheme.textMuted)),
+            style: const TextStyle(
+                fontSize: 13, color: AppTheme.textMuted)),
       ],
     );
   }
 
   Widget _trackerCard(BuildContext context,
-      {required IconData icon, required String title,
-       required String subtitle, required VoidCallback onTap}) {
+      {required IconData icon,
+      required String title,
+      required String subtitle,
+      required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -238,10 +268,13 @@ class DashboardScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(title,
-                      style: const TextStyle(fontWeight: FontWeight.w600,
-                          fontSize: 15, color: AppTheme.textPrimary)),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                          color: AppTheme.textPrimary)),
                   Text(subtitle,
-                      style: const TextStyle(fontSize: 13, color: AppTheme.textMuted)),
+                      style: const TextStyle(
+                          fontSize: 13, color: AppTheme.textMuted)),
                 ],
               ),
             ),

@@ -5,6 +5,7 @@ import 'package:trackwell/app_theme.dart';
 import 'package:trackwell/login_screen.dart';
 import 'package:trackwell/signup_screen.dart';
 import 'package:trackwell/dashboard_screen.dart';
+import 'package:trackwell/settings_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,7 +16,7 @@ void main() async {
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+  const MyApp({super.key}); // küçük modern kullanım
 
   @override
   Widget build(BuildContext context) {
@@ -23,11 +24,14 @@ class MyApp extends StatelessWidget {
       title: 'TrackWell',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.theme,
+
       initialRoute: '/login',
+
       routes: {
-        '/login': (_) => const LoginScreen(),
-        '/signup': (_) => const SignupScreen(),
-        '/home': (_) => const DashboardScreen(),
+        '/login': (context) => const LoginScreen(),
+        '/signup': (context) => const SignupScreen(),
+        '/home': (context) => const DashboardScreen(),
+        '/settings': (context) => const SettingsScreen(),
       },
     );
   }
