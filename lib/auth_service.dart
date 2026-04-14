@@ -5,29 +5,51 @@ class AuthService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
   static final GoogleSignIn _googleSignIn = GoogleSignIn();
 
+  static User? get currentUser => _auth.currentUser;
+
+  /// Sign in with email + password.
+  static Future<UserCredential> signInWithEmail(
+      String email, String password) async {
+    return _auth.signInWithEmailAndPassword(
+      email: email.trim(),
+      password: password.trim(),
+    );
+  }
+
+  /// Create account then immediately set display name.
+  static Future<UserCredential> createAccountWithEmail(
+      String name, String email, String password) async {
+    final cred = await _auth.createUserWithEmailAndPassword(
+      email: email.trim(),
+      password: password.trim(),
+    );
+    await cred.user?.updateDisplayName(name.trim());
+    return cred;
+  }
+
+  /// Google OAuth sign-in.
   static Future<UserCredential?> signInWithGoogle() async {
     try {
-      // Trigger the Google authentication flow
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) return null; // User cancelled
-
-      // Obtain the auth details from the request
+      if (googleUser == null) return null;
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
-
-      // Create a new credential
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
-
-      // Sign in to Firebase with the Google credential
       return await _auth.signInWithCredential(credential);
     } catch (e) {
       rethrow;
     }
   }
 
+  /// Send a password-reset email (was missing — "Forgot password?" was dead UI).
+  static Future<void> sendPasswordReset(String email) async {
+    await _auth.sendPasswordResetEmail(email: email.trim());
+  }
+
+  /// Sign out of Firebase and Google together.
   static Future<void> signOut() async {
     await Future.wait([
       _auth.signOut(),

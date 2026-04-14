@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'app_theme.dart';
-import 'signup_screen.dart';
-import 'auth_service.dart';
+import 'package:trackwell/app_theme.dart';
+import 'package:trackwell/signup_screen.dart';
+import 'package:trackwell/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({Key? key}) : super(key: key);
+  const LoginScreen({super.key});
+
   @override
-  _LoginScreenState createState() => _LoginScreenState();
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
@@ -17,18 +17,23 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
   String? _errorMessage;
 
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
   Future<void> _login() async {
     setState(() { _isLoading = true; _errorMessage = null; });
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
-      Navigator.pushReplacementNamed(context, '/home');
-    } on FirebaseAuthException catch (e) {
-      setState(() { _errorMessage = e.message; });
+      await AuthService.signInWithEmail(
+        _emailController.text, _passwordController.text);
+      if (mounted) Navigator.pushReplacementNamed(context, '/home');
+    } on Exception catch (e) {
+      setState(() => _errorMessage = e.toString().replaceFirst('Exception: ', ''));
     } finally {
-      setState(() { _isLoading = false; });
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -36,21 +41,58 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() { _isLoading = true; _errorMessage = null; });
     try {
       final result = await AuthService.signInWithGoogle();
-      if (result != null && mounted) {
-        Navigator.pushReplacementNamed(context, '/home');
-      }
+      if (result != null && mounted) Navigator.pushReplacementNamed(context, '/home');
     } catch (e) {
-      setState(() { _errorMessage = e.toString(); });
+      setState(() => _errorMessage = e.toString());
     } finally {
-      if (mounted) setState(() { _isLoading = false; });
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
+  Future<void> _forgotPassword() async {
+    final emailController = TextEditingController(text: _emailController.text);
+    final sent = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Reset Password'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Enter your email and we\'ll send a reset link.'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: emailController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
+                hintText: 'you@example.com',
+                prefixIcon: Icon(Icons.mail_outline, size: 20),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Send')),
+        ],
+      ),
+    );
+    if (sent == true) {
+      try {
+        await AuthService.sendPasswordReset(emailController.text);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Password reset email sent!')));
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: ${e.toString()}')));
+        }
+      }
+    }
+    emailController.dispose();
   }
 
   @override
@@ -78,10 +120,8 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 24),
               const Center(
                 child: Text('Welcome back',
-                    style: TextStyle(
-                      fontSize: 28, fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimary,
-                    )),
+                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold,
+                        color: AppTheme.textPrimary)),
               ),
               const SizedBox(height: 8),
               const Center(
@@ -96,6 +136,7 @@ class _LoginScreenState extends State<LoginScreen> {
               TextFormField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.next,
                 decoration: const InputDecoration(
                   hintText: 'you@example.com',
                   hintStyle: TextStyle(color: AppTheme.textMuted),
@@ -110,31 +151,40 @@ class _LoginScreenState extends State<LoginScreen> {
               TextFormField(
                 controller: _passwordController,
                 obscureText: _obscurePassword,
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => _login(),
                 decoration: InputDecoration(
                   hintText: 'Enter your password',
                   hintStyle: const TextStyle(color: AppTheme.textMuted),
-                  prefixIcon: const Icon(Icons.lock_outline, color: AppTheme.textMuted, size: 20),
+                  prefixIcon: const Icon(Icons.lock_outline,
+                      color: AppTheme.textMuted, size: 20),
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                      _obscurePassword
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
                       color: AppTheme.textMuted, size: 20,
                     ),
-                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                    onPressed: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
                   ),
                 ),
               ),
               const SizedBox(height: 12),
               Align(
                 alignment: Alignment.centerLeft,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryLight,
-                    borderRadius: BorderRadius.circular(20),
+                child: GestureDetector(
+                  onTap: _forgotPassword,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryLight,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Text('Forgot password?',
+                        style: TextStyle(fontSize: 13, color: AppTheme.primary,
+                            fontWeight: FontWeight.w500)),
                   ),
-                  child: const Text('Forgot password?',
-                      style: TextStyle(fontSize: 13, color: AppTheme.primary,
-                          fontWeight: FontWeight.w500)),
                 ),
               ),
               if (_errorMessage != null) ...[
@@ -154,13 +204,19 @@ class _LoginScreenState extends State<LoginScreen> {
                   ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
                   : Column(
                       children: [
-                        ElevatedButton.icon(
-                          onPressed: _login,
-                          icon: const Icon(Icons.arrow_forward, size: 18),
-                          label: const Text('Sign in'),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: _login,
+                            icon: const Icon(Icons.arrow_forward, size: 18),
+                            label: const Text('Sign in'),
+                          ),
                         ),
                         const SizedBox(height: 12),
-                        _outlineButton(Icons.apple, 'Continue with Apple', () {}),
+                        _outlineButton(Icons.apple, 'Continue with Apple', () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Apple sign-in coming soon.')));
+                        }),
                         const SizedBox(height: 10),
                         _googleButton(),
                       ],
@@ -214,7 +270,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // Dedicated Google button with the official "G" logo colors
   Widget _googleButton() {
     return SizedBox(
       width: double.infinity,
@@ -229,20 +284,14 @@ class _LoginScreenState extends State<LoginScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Google "G" logo drawn with colored segments
             SizedBox(
               width: 20, height: 20,
               child: CustomPaint(painter: _GoogleLogoPainter()),
             ),
             const SizedBox(width: 10),
-            const Text(
-              'Continue with Google',
-              style: TextStyle(
-                color: AppTheme.textPrimary,
-                fontWeight: FontWeight.w500,
-                fontSize: 14,
-              ),
-            ),
+            const Text('Continue with Google',
+                style: TextStyle(color: AppTheme.textPrimary,
+                    fontWeight: FontWeight.w500, fontSize: 14)),
           ],
         ),
       ),
@@ -250,7 +299,6 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-// Draws the official Google "G" logo using colored arcs
 class _GoogleLogoPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
@@ -258,35 +306,27 @@ class _GoogleLogoPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
     const strokeWidth = 3.0;
-
-    final paint = Paint()..style = PaintingStyle.stroke..strokeWidth = strokeWidth;
-
-    // Red arc (top-right)
-    paint.color = const Color(0xFFEA4335);
-    canvas.drawArc(rect, -0.52, 1.62, false, paint);
-
-    // Yellow arc (bottom-right)
-    paint.color = const Color(0xFFFBBC05);
-    canvas.drawArc(rect, 1.1, 0.92, false, paint);
-
-    // Green arc (bottom-left)
-    paint.color = const Color(0xFF34A853);
-    canvas.drawArc(rect, 2.02, 1.0, false, paint);
-
-    // Blue arc (left + horizontal bar)
-    paint.color = const Color(0xFF4285F4);
-    canvas.drawArc(rect, 3.02, 1.62, false, paint);
-
-    // Blue horizontal bar on the right side of the "G"
-    final barPaint = Paint()
-      ..color = const Color(0xFF4285F4)
-      ..strokeWidth = strokeWidth
+    final paint = Paint()
       ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
+
+    paint.color = const Color(0xFF4285F4);
+    canvas.drawArc(rect, -0.52, 1.57, false, paint);
+    paint.color = const Color(0xFF34A853);
+    canvas.drawArc(rect, 1.05, 1.57, false, paint);
+    paint.color = const Color(0xFFFBBC05);
+    canvas.drawArc(rect, 2.62, 0.79, false, paint);
+    paint.color = const Color(0xFFEA4335);
+    canvas.drawArc(rect, -1.83, 1.31, false, paint);
+
+    paint
+      ..color = const Color(0xFF4285F4)
+      ..strokeWidth = strokeWidth;
     canvas.drawLine(
       Offset(center.dx, center.dy),
-      Offset(center.dx + radius, center.dy),
-      barPaint,
+      Offset(center.dx + radius * 0.72, center.dy),
+      paint,
     );
   }
 

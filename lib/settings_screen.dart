@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'app_theme.dart';
-import 'auth_service.dart'; // ← NEW IMPORT
+import 'auth_service.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({Key? key}) : super(key: key);
+  const SettingsScreen({super.key});
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -29,7 +29,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           .doc('preferences');
 
   DocumentReference<Map<String, dynamic>> get _todayWaterRef {
-    final today = DateTime.now().toIso8601String().substring(0, 10);
+    final today =
+        DateTime.now().toIso8601String().substring(0, 10);
     return FirebaseFirestore.instance
         .collection('users')
         .doc(_user?.uid)
@@ -43,16 +44,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _loadSettings();
   }
 
+  // FIX: Added dispose() — was missing, causing TextEditingController leak
+  @override
+  void dispose() {
+    _waterGoalController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadSettings() async {
     if (_user == null) {
       setState(() => _loading = false);
       return;
     }
-
     try {
       final doc = await _prefsRef.get();
       final data = doc.data();
-
       _waterGoalController.text =
           (data?['daily_water_goal_ml'] ?? 2000).toString();
       _distanceUnit = data?['distance_unit'] ?? 'km';
@@ -60,7 +66,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to load settings.')),
+          const SnackBar(
+              content: Text('Failed to load settings.')),
         );
       }
     } finally {
@@ -70,11 +77,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _saveSettings() async {
     if (_user == null) return;
-
-    final waterGoal = int.tryParse(_waterGoalController.text.trim()) ?? 2000;
-
+    final waterGoal =
+        int.tryParse(_waterGoalController.text.trim()) ?? 2000;
     setState(() => _saving = true);
-
     try {
       await _prefsRef.set({
         'daily_water_goal_ml': waterGoal,
@@ -85,14 +90,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Settings saved successfully.')),
+          const SnackBar(
+              content: Text('Settings saved successfully.')),
         );
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to save settings.')),
+          const SnackBar(
+              content: Text('Failed to save settings.')),
         );
       }
     } finally {
@@ -102,12 +109,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _resetTodayWater() async {
     if (_user == null) return;
-
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Reset water log?'),
-        content: const Text('This will set today\'s water intake back to 0 ml.'),
+        content: const Text(
+            'This will set today\'s water intake back to 0 ml.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -115,20 +122,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Reset', style: TextStyle(color: Colors.red)),
+            child: const Text('Reset',
+                style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
-
     if (confirm != true) return;
-
     try {
       await _todayWaterRef.set({
         'intake_ml': 0,
         'updated_at': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Water reset to 0 ml.')),
@@ -137,7 +142,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to reset water.')),
+          const SnackBar(
+              content: Text('Failed to reset water.')),
         );
       }
     }
@@ -156,34 +162,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Sign out', style: TextStyle(color: Colors.red)),
+            child: const Text('Sign out',
+                style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
-
     if (confirm != true) return;
-
-    // ← CHANGED: AuthService.signOut() handles both Firebase + Google sign-out
     await AuthService.signOut();
     if (mounted) {
-      Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+      Navigator.pushNamedAndRemoveUntil(
+          context, '/login', (route) => false);
     }
-  }
-
-  @override
-  void dispose() {
-    _waterGoalController.dispose();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final user = _user;
-
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
+        backgroundColor: AppTheme.background,
         title: const Text('Settings'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -197,50 +196,158 @@ class _SettingsScreenState extends State<SettingsScreen> {
               : SingleChildScrollView(
                   padding: const EdgeInsets.all(20),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
                     children: [
+                      // Account info card
+                      _card(
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 22,
+                              backgroundColor:
+                                  AppTheme.primaryLight,
+                              child: Text(
+                                (user.displayName?.isNotEmpty ==
+                                        true
+                                    ? user.displayName![0]
+                                    : user.email![0])
+                                    .toUpperCase(),
+                                style: const TextStyle(
+                                    color: AppTheme.primary,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    user.displayName ??
+                                        'No name set',
+                                    style: const TextStyle(
+                                        fontWeight:
+                                            FontWeight.w600,
+                                        fontSize: 15,
+                                        color:
+                                            AppTheme.textPrimary),
+                                  ),
+                                  Text(
+                                    user.email ?? '',
+                                    style: const TextStyle(
+                                        fontSize: 13,
+                                        color:
+                                            AppTheme.textMuted),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+
                       _sectionTitle('Preferences'),
                       const SizedBox(height: 10),
 
                       _card(
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment:
+                              CrossAxisAlignment.start,
                           children: [
-                            const Text('Daily water goal (ml)'),
+                            const Text('Daily water goal (ml)',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w500,
+                                    color: AppTheme.textPrimary)),
                             const SizedBox(height: 8),
                             TextField(
                               controller: _waterGoalController,
-                              keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(
+                              keyboardType:
+                                  TextInputType.number,
+                              decoration:
+                                  const InputDecoration(
                                 hintText: 'e.g. 2500',
                                 suffixText: 'ml',
                               ),
                             ),
-
                             const SizedBox(height: 20),
-
-                            const Text('Distance unit'),
+                            const Text('Distance unit',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w500,
+                                    color: AppTheme.textPrimary)),
                             const SizedBox(height: 8),
                             SegmentedButton<String>(
                               segments: const [
-                                ButtonSegment(value: 'km', label: Text('KM')),
-                                ButtonSegment(value: 'miles', label: Text('Miles')),
+                                ButtonSegment(
+                                    value: 'km',
+                                    label: Text('KM')),
+                                ButtonSegment(
+                                    value: 'miles',
+                                    label: Text('Miles')),
                               ],
                               selected: {_distanceUnit},
                               onSelectionChanged: (val) {
-                                setState(() => _distanceUnit = val.first);
+                                setState(() =>
+                                    _distanceUnit = val.first);
                               },
                             ),
-
                             const SizedBox(height: 20),
-
                             SwitchListTile(
                               contentPadding: EdgeInsets.zero,
-                              title: const Text('Enable reminders'),
+                              title: const Text(
+                                  'Enable reminders'),
                               value: _remindersEnabled,
                               onChanged: (val) {
-                                setState(() => _remindersEnabled = val);
+                                setState(
+                                    () => _remindersEnabled =
+                                        val);
                               },
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      _sectionTitle('Data'),
+                      const SizedBox(height: 10),
+
+                      // FIX: Reset water button now visible in UI
+                      _card(
+                        child: Column(
+                          children: [
+                            ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primaryLight,
+                                  borderRadius:
+                                      BorderRadius.circular(8),
+                                ),
+                                child: const Icon(
+                                    Icons.water_drop_outlined,
+                                    color: AppTheme.primary,
+                                    size: 18),
+                              ),
+                              title: const Text(
+                                  'Reset today\'s water',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w500,
+                                      color: AppTheme.textPrimary)),
+                              subtitle: const Text(
+                                  'Set today\'s intake to 0 ml',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppTheme.textMuted)),
+                              trailing: const Icon(
+                                  Icons.chevron_right,
+                                  color: AppTheme.textMuted),
+                              onTap: _resetTodayWater,
                             ),
                           ],
                         ),
@@ -253,28 +360,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         child: ElevatedButton(
                           onPressed: _saving ? null : _saveSettings,
                           child: _saving
-                              ? const CircularProgressIndicator(color: Colors.white)
+                              ? const CircularProgressIndicator(
+                                  color: Colors.white)
                               : const Text('Save Settings'),
                         ),
                       ),
 
                       const SizedBox(height: 12),
 
-                      // Sign out button
                       SizedBox(
                         width: double.infinity,
                         child: OutlinedButton.icon(
                           onPressed: _signOut,
-                          icon: const Icon(Icons.logout, size: 18, color: Colors.red),
-                          label: const Text(
-                            'Sign Out',
-                            style: TextStyle(color: Colors.red, fontWeight: FontWeight.w500),
-                          ),
+                          icon: const Icon(Icons.logout,
+                              size: 18, color: Colors.red),
+                          label: const Text('Sign Out',
+                              style: TextStyle(
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.w500)),
                           style: OutlinedButton.styleFrom(
-                            minimumSize: const Size(double.infinity, 52),
-                            side: const BorderSide(color: Colors.red),
+                            minimumSize:
+                                const Size(double.infinity, 52),
+                            side: const BorderSide(
+                                color: Colors.red),
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14)),
+                                borderRadius:
+                                    BorderRadius.circular(14)),
                           ),
                         ),
                       ),
@@ -284,10 +395,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _sectionTitle(String title) {
-    return Text(title,
-        style: const TextStyle(fontWeight: FontWeight.bold));
-  }
+  Widget _sectionTitle(String title) => Text(title,
+      style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 14,
+          color: AppTheme.textPrimary));
 
   Widget _card({required Widget child}) {
     return Container(
