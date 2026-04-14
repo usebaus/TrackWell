@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'app_theme.dart';
+import 'auth_service.dart'; // ← NEW IMPORT
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -86,7 +87,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Settings saved successfully.')),
         );
-        Navigator.pop(context); // save sonrası geri dön
+        Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
@@ -163,7 +164,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (confirm != true) return;
 
-    await FirebaseAuth.instance.signOut();
+    // ← CHANGED: AuthService.signOut() handles both Firebase + Google sign-out
+    await AuthService.signOut();
     if (mounted) {
       Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
     }
@@ -253,6 +255,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           child: _saving
                               ? const CircularProgressIndicator(color: Colors.white)
                               : const Text('Save Settings'),
+                        ),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // Sign out button
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _signOut,
+                          icon: const Icon(Icons.logout, size: 18, color: Colors.red),
+                          label: const Text(
+                            'Sign Out',
+                            style: TextStyle(color: Colors.red, fontWeight: FontWeight.w500),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(double.infinity, 52),
+                            side: const BorderSide(color: Colors.red),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14)),
+                          ),
                         ),
                       ),
                     ],

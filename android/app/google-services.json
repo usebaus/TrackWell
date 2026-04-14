@@ -12,7 +12,20 @@
           "package_name": "com.example.trackwell"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "294561693486-cj02o06hvr8u73dlb4b5fb0hiok857bf.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.trackwell",
+            "certificate_hash": "cf7381654451d8a2ac416a6d7296ccb4fe951148"
+          }
+        },
+        {
+          "client_id": "294561693486-tcjts33in2stceu9bmkqml31bsveectd.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDmfGJeAwPClVxzK7YNtOtpRS81HAfnZ7M"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "294561693486-tcjts33in2stceu9bmkqml31bsveectd.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
