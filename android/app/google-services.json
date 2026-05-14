@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "294561693486-lc5vf7lidtbs1esm163t4g0v78s56djh.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.trackwell",
+            "certificate_hash": "36182e9fff8c4bc4e120e14295a1d2b6f0bdcca8"
+          }
+        },
+        {
           "client_id": "294561693486-tcjts33in2stceu9bmkqml31bsveectd.apps.googleusercontent.com",
           "client_type": 3
         }
