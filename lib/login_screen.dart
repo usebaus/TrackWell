@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import 'package:trackwell/app_theme.dart';
 import 'package:trackwell/signup_screen.dart';
 import 'package:trackwell/auth_service.dart';
@@ -25,42 +26,66 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _login() async {
-    setState(() { _isLoading = true; _errorMessage = null; });
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
     try {
       await AuthService.signInWithEmail(
-        _emailController.text, _passwordController.text);
-      if (mounted) Navigator.pushReplacementNamed(context, '/home');
+        _emailController.text,
+        _passwordController.text,
+      );
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/home');
+      }
     } on Exception catch (e) {
-      setState(() => _errorMessage = e.toString().replaceFirst('Exception: ', ''));
+      setState(
+        () => _errorMessage =
+            e.toString().replaceFirst('Exception: ', ''),
+      );
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   Future<void> _signInWithGoogle() async {
-    setState(() { _isLoading = true; _errorMessage = null; });
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
     try {
       final result = await AuthService.signInWithGoogle();
-      if (result != null && mounted) Navigator.pushReplacementNamed(context, '/home');
+      if (result != null && mounted) {
+        Navigator.pushReplacementNamed(context, '/home');
+      }
     } catch (e) {
       setState(() => _errorMessage = e.toString());
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   Future<void> _forgotPassword() async {
-    final emailController = TextEditingController(text: _emailController.text);
+    final emailController =
+        TextEditingController(text: _emailController.text);
     final sent = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
         title: const Text('Reset Password'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Enter your email and we\'ll send a reset link.'),
+            const Text(
+              'Enter your email and we\'ll send a reset link.',
+            ),
             const SizedBox(height: 16),
             TextField(
               controller: emailController,
@@ -73,8 +98,14 @@ class _LoginScreenState extends State<LoginScreen> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Send')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Send'),
+          ),
         ],
       ),
     );
@@ -83,12 +114,16 @@ class _LoginScreenState extends State<LoginScreen> {
         await AuthService.sendPasswordReset(emailController.text);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Password reset email sent!')));
+            const SnackBar(
+              content: Text('Password reset email sent!'),
+            ),
+          );
         }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: ${e.toString()}')));
+            SnackBar(content: Text('Error: ${e.toString()}')),
+          );
         }
       }
     }
@@ -108,30 +143,49 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 48),
               Center(
                 child: Container(
-                  width: 64, height: 64,
+                  width: 64,
+                  height: 64,
                   decoration: BoxDecoration(
                     color: AppTheme.primaryLight,
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Icon(Icons.monitor_heart_outlined,
-                      color: AppTheme.primary, size: 32),
+                  child: const Icon(
+                    Icons.monitor_heart_outlined,
+                    color: AppTheme.primary,
+                    size: 32,
+                  ),
                 ),
               ),
               const SizedBox(height: 24),
               const Center(
-                child: Text('Welcome back',
-                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold,
-                        color: AppTheme.textPrimary)),
+                child: Text(
+                  'Welcome back',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
               ),
               const SizedBox(height: 8),
               const Center(
-                child: Text('Sign in to access your dashboard',
-                    style: TextStyle(fontSize: 15, color: AppTheme.textMuted)),
+                child: Text(
+                  'Sign in to access your dashboard',
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: AppTheme.textMuted,
+                  ),
+                ),
               ),
               const SizedBox(height: 40),
-              const Text('Email',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500,
-                      color: AppTheme.textPrimary)),
+              const Text(
+                'Email',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
               const SizedBox(height: 8),
               TextFormField(
                 controller: _emailController,
@@ -140,13 +194,22 @@ class _LoginScreenState extends State<LoginScreen> {
                 decoration: const InputDecoration(
                   hintText: 'you@example.com',
                   hintStyle: TextStyle(color: AppTheme.textMuted),
-                  prefixIcon: Icon(Icons.mail_outline, color: AppTheme.textMuted, size: 20),
+                  prefixIcon: Icon(
+                    Icons.mail_outline,
+                    color: AppTheme.textMuted,
+                    size: 20,
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
-              const Text('Password',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500,
-                      color: AppTheme.textPrimary)),
+              const Text(
+                'Password',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
               const SizedBox(height: 8),
               TextFormField(
                 controller: _passwordController,
@@ -155,18 +218,25 @@ class _LoginScreenState extends State<LoginScreen> {
                 onFieldSubmitted: (_) => _login(),
                 decoration: InputDecoration(
                   hintText: 'Enter your password',
-                  hintStyle: const TextStyle(color: AppTheme.textMuted),
-                  prefixIcon: const Icon(Icons.lock_outline,
-                      color: AppTheme.textMuted, size: 20),
+                  hintStyle:
+                      const TextStyle(color: AppTheme.textMuted),
+                  prefixIcon: const Icon(
+                    Icons.lock_outline,
+                    color: AppTheme.textMuted,
+                    size: 20,
+                  ),
                   suffixIcon: IconButton(
                     icon: Icon(
                       _obscurePassword
                           ? Icons.visibility_off_outlined
                           : Icons.visibility_outlined,
-                      color: AppTheme.textMuted, size: 20,
+                      color: AppTheme.textMuted,
+                      size: 20,
                     ),
-                    onPressed: () =>
-                        setState(() => _obscurePassword = !_obscurePassword),
+                    onPressed: () => setState(
+                      () =>
+                          _obscurePassword = !_obscurePassword,
+                    ),
                   ),
                 ),
               ),
@@ -176,14 +246,22 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: GestureDetector(
                   onTap: _forgotPassword,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 7,
+                    ),
                     decoration: BoxDecoration(
                       color: AppTheme.primaryLight,
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: const Text('Forgot password?',
-                        style: TextStyle(fontSize: 13, color: AppTheme.primary,
-                            fontWeight: FontWeight.w500)),
+                    child: const Text(
+                      'Forgot password?',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppTheme.primary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -195,50 +273,75 @@ class _LoginScreenState extends State<LoginScreen> {
                     color: const Color(0xFFFFEEEE),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Text(_errorMessage!,
-                      style: const TextStyle(color: Colors.red, fontSize: 13)),
+                  child: Text(
+                    _errorMessage!,
+                    style: const TextStyle(
+                      color: Colors.red,
+                      fontSize: 13,
+                    ),
+                  ),
                 ),
               ],
               const SizedBox(height: 24),
               _isLoading
-                  ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: AppTheme.primary,
+                      ),
+                    )
                   : Column(
                       children: [
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton.icon(
                             onPressed: _login,
-                            icon: const Icon(Icons.arrow_forward, size: 18),
+                            icon: const Icon(
+                              Icons.arrow_forward,
+                              size: 18,
+                            ),
                             label: const Text('Sign in'),
                           ),
                         ),
                         const SizedBox(height: 12),
-                        _outlineButton(Icons.apple, 'Continue with Apple', () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Apple sign-in coming soon.')));
-                        }),
-                        const SizedBox(height: 10),
                         _googleButton(),
                       ],
                     ),
               const SizedBox(height: 28),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment:
+                    MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('New to TrackWell?',
-                      style: TextStyle(color: AppTheme.textMuted, fontSize: 14)),
+                  const Text(
+                    'New to TrackWell?',
+                    style: TextStyle(
+                      color: AppTheme.textMuted,
+                      fontSize: 14,
+                    ),
+                  ),
                   GestureDetector(
-                    onTap: () => Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => const SignupScreen())),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SignupScreen(),
+                      ),
+                    ),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: AppTheme.primaryLight,
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: const Text('Create account',
-                          style: TextStyle(color: AppTheme.primary,
-                              fontWeight: FontWeight.w600, fontSize: 13)),
+                      child: const Text(
+                        'Create account',
+                        style: TextStyle(
+                          color: AppTheme.primary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -246,25 +349,6 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 32),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _outlineButton(IconData icon, String label, VoidCallback onTap) {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton.icon(
-        onPressed: onTap,
-        icon: Icon(icon, size: 18, color: AppTheme.textPrimary),
-        label: Text(label,
-            style: const TextStyle(color: AppTheme.textPrimary,
-                fontWeight: FontWeight.w500)),
-        style: OutlinedButton.styleFrom(
-          minimumSize: const Size(double.infinity, 52),
-          side: const BorderSide(color: AppTheme.border),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          backgroundColor: Colors.white,
         ),
       ),
     );
@@ -278,20 +362,30 @@ class _LoginScreenState extends State<LoginScreen> {
         style: OutlinedButton.styleFrom(
           minimumSize: const Size(double.infinity, 52),
           side: const BorderSide(color: AppTheme.border),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
           backgroundColor: Colors.white,
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             SizedBox(
-              width: 20, height: 20,
-              child: CustomPaint(painter: _GoogleLogoPainter()),
+              width: 20,
+              height: 20,
+              child: CustomPaint(
+                painter: _GoogleLogoPainter(),
+              ),
             ),
             const SizedBox(width: 10),
-            const Text('Continue with Google',
-                style: TextStyle(color: AppTheme.textPrimary,
-                    fontWeight: FontWeight.w500, fontSize: 14)),
+            const Text(
+              'Continue with Google',
+              style: TextStyle(
+                color: AppTheme.textPrimary,
+                fontWeight: FontWeight.w500,
+                fontSize: 14,
+              ),
+            ),
           ],
         ),
       ),

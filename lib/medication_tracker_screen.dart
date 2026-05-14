@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+
 import 'app_theme.dart';
 
 class MedicationTrackerScreen extends StatefulWidget {
@@ -32,21 +33,22 @@ class _MedicationTrackerScreenState
       await _medsCol.add({
         'name': text,
         'dosage': dosage,
-        'taken': false, // FIX: track whether taken today
+        'taken': false,
         'created_at': FieldValue.serverTimestamp(),
       });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text(
-                  'Failed to add medication. Please try again.')),
+            content: Text(
+              'Failed to add medication. Please try again.',
+            ),
+          ),
         );
       }
     }
   }
 
-  // FIX: Toggle taken status — was missing entirely
   Future<void> _toggleTaken(String docId, bool current) async {
     try {
       await _medsCol.doc(docId).update({'taken': !current});
@@ -54,7 +56,8 @@ class _MedicationTrackerScreenState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('Failed to update medication.')),
+            content: Text('Failed to update medication.'),
+          ),
         );
       }
     }
@@ -67,7 +70,8 @@ class _MedicationTrackerScreenState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('Failed to delete medication.')),
+            content: Text('Failed to delete medication.'),
+          ),
         );
       }
     }
@@ -101,7 +105,8 @@ class _MedicationTrackerScreenState
                     controller: _medicationController,
                     textInputAction: TextInputAction.next,
                     decoration: const InputDecoration(
-                        labelText: 'Medication name'),
+                      labelText: 'Medication name',
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -111,7 +116,8 @@ class _MedicationTrackerScreenState
                     controller: _dosageController,
                     textInputAction: TextInputAction.done,
                     decoration: const InputDecoration(
-                        labelText: 'Dosage (optional)'),
+                      labelText: 'Dosage (optional)',
+                    ),
                     onSubmitted: (_) => _addMedication(),
                   ),
                 ),
@@ -136,12 +142,13 @@ class _MedicationTrackerScreenState
                   if (snapshot.connectionState ==
                       ConnectionState.waiting) {
                     return const Center(
-                        child: CircularProgressIndicator());
+                      child: CircularProgressIndicator(),
+                    );
                   }
                   if (snapshot.hasError) {
                     return const Center(
-                        child:
-                            Text('Error loading medications.'));
+                      child: Text('Error loading medications.'),
+                    );
                   }
                   final docs = snapshot.data?.docs ?? [];
                   if (docs.isEmpty) {
@@ -149,12 +156,18 @@ class _MedicationTrackerScreenState
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.medication_outlined,
-                              size: 48, color: AppTheme.textMuted),
+                          Icon(
+                            Icons.medication_outlined,
+                            size: 48,
+                            color: AppTheme.textMuted,
+                          ),
                           SizedBox(height: 12),
-                          Text('No medications logged yet.',
-                              style: TextStyle(
-                                  color: AppTheme.textMuted)),
+                          Text(
+                            'No medications logged yet.',
+                            style: TextStyle(
+                              color: AppTheme.textMuted,
+                            ),
+                          ),
                         ],
                       ),
                     );
@@ -169,7 +182,6 @@ class _MedicationTrackerScreenState
                       final dosage = d['dosage'] as String? ?? '';
                       return Card(
                         child: ListTile(
-                          // FIX: Checkmark to mark medication as taken
                           leading: GestureDetector(
                             onTap: () =>
                                 _toggleTaken(doc.id, taken),
@@ -196,23 +208,28 @@ class _MedicationTrackerScreenState
                           title: Text(
                             d['name'] as String,
                             style: TextStyle(
-                                decoration: taken
-                                    ? TextDecoration.lineThrough
-                                    : null,
-                                color: taken
-                                    ? AppTheme.textMuted
-                                    : AppTheme.textPrimary),
+                              decoration: taken
+                                  ? TextDecoration.lineThrough
+                                  : null,
+                              color: taken
+                                  ? AppTheme.textMuted
+                                  : AppTheme.textPrimary,
+                            ),
                           ),
                           subtitle: dosage.isNotEmpty
-                              ? Text(dosage,
+                              ? Text(
+                                  dosage,
                                   style: const TextStyle(
-                                      fontSize: 12,
-                                      color: AppTheme.textMuted))
+                                    fontSize: 12,
+                                    color: AppTheme.textMuted,
+                                  ),
+                                )
                               : null,
                           trailing: IconButton(
                             icon: const Icon(
-                                Icons.delete_outline,
-                                color: Colors.red),
+                              Icons.delete_outline,
+                              color: Colors.red,
+                            ),
                             onPressed: () =>
                                 _removeMedication(doc.id),
                           ),
