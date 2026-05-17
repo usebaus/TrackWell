@@ -1,8 +1,8 @@
 # TrackWell
 
-TrackWell is a Flutter-based health tracking app that helps you stay on top of your daily habits, including water intake, exercise, meals, and medications.[cite:18][cite:19]
+TrackWell is a Flutter-based health tracking app that helps you stay on top of your daily habits, including water intake, exercise, meals, and medications.
 
-The app is built as a student capstone project and uses Firebase Authentication and Cloud Firestore to securely store user data.[cite:18][cite:19][cite:26]
+The app is built as a student capstone project and uses Firebase Authentication and Cloud Firestore to securely store user data.
 
 ---
 
