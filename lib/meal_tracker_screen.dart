@@ -46,10 +46,10 @@ class _MealTrackerScreenState extends State<MealTrackerScreen> {
     final text = _mealController.text.trim();
     if (text.isEmpty) return;
     final cals = int.tryParse(_caloriesController.text.trim()) ?? 0;
-    
+
     _mealController.clear();
     _caloriesController.clear();
-    
+
     try {
       await _mealsCol.add({
         'name': text,
@@ -96,23 +96,14 @@ class _MealTrackerScreenState extends State<MealTrackerScreen> {
       lastDate: DateTime.now(),
     );
     if (picked != null) {
-      setState(() {
-        _selectedDate = picked;
-      });
+      setState(() => _selectedDate = picked);
     }
   }
 
-  void _goToToday() {
-    setState(() {
-      _selectedDate = DateTime.now();
-    });
-  }
+  void _goToToday() => setState(() => _selectedDate = DateTime.now());
 
-  void _goToYesterday() {
-    setState(() {
-      _selectedDate = _selectedDate.subtract(const Duration(days: 1));
-    });
-  }
+  void _goToYesterday() =>
+      setState(() => _selectedDate = _selectedDate.subtract(const Duration(days: 1)));
 
   @override
   void dispose() {
@@ -141,7 +132,7 @@ class _MealTrackerScreenState extends State<MealTrackerScreen> {
       ),
       body: Column(
         children: [
-          // Date selector bar - FIXED: No overflow
+          // ── Date selector bar ──
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             color: Colors.white,
@@ -171,126 +162,125 @@ class _MealTrackerScreenState extends State<MealTrackerScreen> {
                 IconButton(
                   onPressed: _goToYesterday,
                   icon: const Icon(Icons.arrow_back, size: 20),
-                  tooltip: 'Yesterday',
+                  tooltip: 'Previous day',
                 ),
               ],
             ),
           ),
 
-          // Add meal form (only for today)
-          if (isToday)
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  // Meal type selector
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: _mealTypes.map((type) {
-                        final selected = _selectedMealType == type;
-                        return GestureDetector(
-                          onTap: () => setState(() => _selectedMealType = type),
-                          child: Container(
-                            margin: const EdgeInsets.only(right: 8),
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                            decoration: BoxDecoration(
-                              color: selected ? AppTheme.primary : Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: selected ? AppTheme.primary : AppTheme.border,
-                              ),
-                            ),
-                            child: Text(
-                              type,
-                              style: TextStyle(
-                                color: selected ? Colors.white : AppTheme.textPrimary,
-                                fontWeight: FontWeight.w500,
-                                fontSize: 12,
-                              ),
+          // ── Add meal form (ALL dates) ──
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (!isToday)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryLight,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.edit_calendar, color: AppTheme.primary, size: 18),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Adding meal for ${_displayFormat.format(_selectedDate)}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                              color: AppTheme.textPrimary,
                             ),
                           ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: 3,
-                        child: TextField(
-                          controller: _mealController,
-                          textInputAction: TextInputAction.next,
-                          decoration: const InputDecoration(
-                            labelText: 'Meal name',
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                          ),
-                          style: const TextStyle(fontSize: 14),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        flex: 2,
-                        child: TextField(
-                          controller: _caloriesController,
-                          keyboardType: TextInputType.number,
-                          textInputAction: TextInputAction.done,
-                          decoration: const InputDecoration(
-                            labelText: 'Calories',
-                            suffixText: 'kcal',
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                          ),
-                          style: const TextStyle(fontSize: 14),
-                          onSubmitted: (_) => _addMeal(),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: _addMeal,
-                      icon: const Icon(Icons.add, size: 18),
-                      label: const Text('Add Meal'),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        ],
                       ),
                     ),
                   ),
-                ],
-              ),
-            ),
-
-          // Date label for history view
-          if (!isToday)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryLight,
-                  borderRadius: BorderRadius.circular(10),
+                // Meal type selector
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: _mealTypes.map((type) {
+                      final selected = _selectedMealType == type;
+                      return GestureDetector(
+                        onTap: () => setState(() => _selectedMealType = type),
+                        child: Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: selected ? AppTheme.primary : Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: selected ? AppTheme.primary : AppTheme.border,
+                            ),
+                          ),
+                          child: Text(
+                            type,
+                            style: TextStyle(
+                              color: selected ? Colors.white : AppTheme.textPrimary,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
                 ),
-                child: Row(
+                const SizedBox(height: 12),
+                Row(
                   children: [
-                    const Icon(Icons.history, color: AppTheme.primary, size: 18),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Meals on ${_displayFormat.format(_selectedDate)}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                        color: AppTheme.textPrimary,
+                    Expanded(
+                      flex: 3,
+                      child: TextField(
+                        controller: _mealController,
+                        textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(
+                          labelText: 'Meal name',
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        ),
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      flex: 2,
+                      child: TextField(
+                        controller: _caloriesController,
+                        keyboardType: TextInputType.number,
+                        textInputAction: TextInputAction.done,
+                        decoration: const InputDecoration(
+                          labelText: 'Calories',
+                          suffixText: 'kcal',
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        ),
+                        style: const TextStyle(fontSize: 14),
+                        onSubmitted: (_) => _addMeal(),
                       ),
                     ),
                   ],
                 ),
-              ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _addMeal,
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Add Meal'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
             ),
+          ),
 
-          // Meal list
+          // ── Meal list ──
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: _mealsCol
@@ -304,10 +294,9 @@ class _MealTrackerScreenState extends State<MealTrackerScreen> {
                 if (snapshot.hasError) {
                   return const Center(child: Text('Error loading meals.'));
                 }
-                
+
                 final docs = snapshot.data?.docs ?? [];
-                
-                final totalCalories = docs.fold<int>(0, (sum, doc) {
+                final totalCalories = docs.fold(0, (sum, doc) {
                   final d = doc.data() as Map<String, dynamic>;
                   return sum + (d['calories'] as int? ?? 0);
                 });
@@ -329,11 +318,10 @@ class _MealTrackerScreenState extends State<MealTrackerScreen> {
                               : 'No meals logged on this day.',
                           style: const TextStyle(color: AppTheme.textMuted, fontSize: 14),
                         ),
-                        if (isToday)
-                          const Text(
-                            'Add your first meal above.',
-                            style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
-                          ),
+                        const Text(
+                          'Add a meal using the form above.',
+                          style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                        ),
                       ],
                     ),
                   );
@@ -357,23 +345,21 @@ class _MealTrackerScreenState extends State<MealTrackerScreen> {
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.local_fire_department, color: Colors.white, size: 24),
+                            const Icon(Icons.local_fire_department,
+                                color: Colors.white, size: 24),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
-                                    'Total Calories',
-                                    style: TextStyle(color: Colors.white70, fontSize: 11),
-                                  ),
+                                  const Text('Total Calories',
+                                      style: TextStyle(color: Colors.white70, fontSize: 11)),
                                   Text(
                                     '$totalCalories kcal',
                                     style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold),
                                   ),
                                 ],
                               ),
@@ -393,12 +379,12 @@ class _MealTrackerScreenState extends State<MealTrackerScreen> {
                         ),
                       );
                     }
-                    
+
                     final doc = docs[index - 1];
                     final d = doc.data() as Map<String, dynamic>;
                     final cals = d['calories'] as int? ?? 0;
                     final mealType = d['meal_type'] as String? ?? '';
-                    
+
                     return Card(
                       margin: const EdgeInsets.only(bottom: 8),
                       child: ListTile(
@@ -408,7 +394,8 @@ class _MealTrackerScreenState extends State<MealTrackerScreen> {
                             color: AppTheme.primaryLight,
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: const Icon(Icons.restaurant_outlined, color: AppTheme.primary, size: 16),
+                          child: const Icon(Icons.restaurant_outlined,
+                              color: AppTheme.primary, size: 16),
                         ),
                         title: Text(
                           d['name'] as String,
@@ -424,18 +411,21 @@ class _MealTrackerScreenState extends State<MealTrackerScreen> {
                             if (cals > 0)
                               Container(
                                 margin: const EdgeInsets.only(right: 8),
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(
                                   color: AppTheme.primaryLight,
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: Text(
                                   '$cals kcal',
-                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
+                                  style: const TextStyle(
+                                      fontSize: 11, fontWeight: FontWeight.w500),
                                 ),
                               ),
                             IconButton(
-                              icon: const Icon(Icons.delete_outline, color: Colors.red, size: 18),
+                              icon: const Icon(Icons.delete_outline,
+                                  color: Colors.red, size: 18),
                               onPressed: () => _removeMeal(doc.id),
                             ),
                           ],

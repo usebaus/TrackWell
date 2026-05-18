@@ -50,6 +50,16 @@ class StepProvider extends ChangeNotifier {
   int get todaySteps => _stepMap[_fmt(DateTime.now())] ?? 0;
   int get dailyGoal => 10000;
 
+  /// All entries that have steps > 0, sorted newest first
+  List<StepEntry> get allEntries {
+    final entries = _stepMap.entries
+        .where((e) => e.value > 0)
+        .map((e) => StepEntry(date: e.key, steps: e.value))
+        .toList();
+    entries.sort((a, b) => b.date.compareTo(a.date));
+    return entries;
+  }
+
   List<StepEntry> entriesForDays(int days) {
     final now = DateTime.now();
     final result = <StepEntry>[];
@@ -84,7 +94,7 @@ class StepProvider extends ChangeNotifier {
   }
 
   String get highestStepDate {
-    if (_stepMap.isEmpty) return '—';
+    if (_stepMap.isEmpty) return '';
     final entry = _stepMap.entries.reduce((a, b) => a.value >= b.value ? a : b);
     return entry.key;
   }
@@ -114,11 +124,10 @@ class StepProvider extends ChangeNotifier {
     return 'Average ${avg.toInt()} steps/day. Add $deficit more to hit your goal!';
   }
 
+  int stepsForDate(String dateKey) => _stepMap[dateKey] ?? 0;
+
   CollectionReference<Map<String, dynamic>>? _colRef(User user) =>
-      _firestore
-          .collection('users')
-          .doc(user.uid)
-          .collection('step_logs');
+      _firestore.collection('users').doc(user.uid).collection('step_logs');
 
   void _onUserChanged(User? user) {
     _stepsSub?.cancel();
@@ -161,6 +170,7 @@ class StepProvider extends ChangeNotifier {
     );
   }
 
+  /// Set (overwrite) steps for a given date
   Future<void> logSteps(int steps, {DateTime? date}) async {
     final user = _auth.currentUser;
     if (user == null) return;
@@ -171,6 +181,7 @@ class StepProvider extends ChangeNotifier {
     );
   }
 
+  /// Add delta to today's steps
   Future<void> addSteps(int delta) async {
     final user = _auth.currentUser;
     if (user == null) return;
@@ -180,6 +191,27 @@ class StepProvider extends ChangeNotifier {
       {'steps': current + delta, 'updated_at': FieldValue.serverTimestamp()},
       SetOptions(merge: true),
     );
+  }
+
+  /// Delete (reset to 0) steps for a specific date
+  Future<void> deleteStepsForDate(String dateKey) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    await _colRef(user)!.doc(dateKey).delete();
+  }
+
+  /// Edit steps for a specific date key
+  Future<void> editStepsForDate(String dateKey, int newSteps) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    if (newSteps <= 0) {
+      await deleteStepsForDate(dateKey);
+    } else {
+      await _colRef(user)!.doc(dateKey).set(
+        {'steps': newSteps, 'updated_at': FieldValue.serverTimestamp()},
+        SetOptions(merge: true),
+      );
+    }
   }
 
   Future<void> seedDemoDataIfEmpty() async {
@@ -200,12 +232,10 @@ class StepProvider extends ChangeNotifier {
           : 7000 + rng.nextInt(5000);
       batch.set(col.doc(key), {
         'steps': steps,
-        'updated_at': Timestamp.fromDate(
-            DateTime(d.year, d.month, d.day, 20, 0)),
+        'updated_at': Timestamp.fromDate(DateTime(d.year, d.month, d.day, 20, 0)),
       });
     }
     await batch.commit();
-    // ✅ Firestore stream auto-updates — no manual _onUserChanged needed
   }
 
   @override

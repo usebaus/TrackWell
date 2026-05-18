@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 
 import 'app_theme.dart';
 import 'goal_provider.dart';
@@ -10,8 +11,7 @@ class ExerciseTrackerScreen extends StatefulWidget {
   const ExerciseTrackerScreen({super.key});
 
   @override
-  State<ExerciseTrackerScreen> createState() =>
-      _ExerciseTrackerScreenState();
+  State<ExerciseTrackerScreen> createState() => _ExerciseTrackerScreenState();
 }
 
 class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
@@ -21,16 +21,14 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
   final _notesController = TextEditingController();
   final _heartRateController = TextEditingController();
 
+  late DateTime _selectedDate;
+  final DateFormat _dateFormat = DateFormat('yyyy-MM-dd');
+  final DateFormat _displayFormat = DateFormat('d MMM yyyy');
+
   String _selectedActivity = 'Run';
   String _selectedIntensity = 'Medium';
 
-  final List<String> _quickActivities = [
-    'Run',
-    'Walk',
-    'Cycle',
-    'Swim',
-    'Strength',
-  ];
+  final List<String> _quickActivities = ['Run', 'Walk', 'Cycle', 'Swim', 'Strength'];
 
   final List<Map<String, dynamic>> _allActivities = [
     {'name': 'Run', 'icon': Icons.directions_run},
@@ -47,20 +45,32 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
 
   final List<String> _intensities = ['Low', 'Medium', 'High'];
 
+  @override
+  void initState() {
+    super.initState();
+    _selectedDate = DateTime.now();
+  }
+
   String get _uid => FirebaseAuth.instance.currentUser!.uid;
+  String get _selectedDateKey => _dateFormat.format(_selectedDate);
+
+  bool get _isToday {
+    final now = DateTime.now();
+    return _selectedDate.year == now.year &&
+        _selectedDate.month == now.month &&
+        _selectedDate.day == now.day;
+  }
 
   CollectionReference get _exercisesCol => FirebaseFirestore.instance
       .collection('users')
       .doc(_uid)
       .collection('exercises');
 
-  String get _today => DateTime.now().toIso8601String().substring(0, 10);
-
   DocumentReference get _totalsDoc => FirebaseFirestore.instance
       .collection('users')
       .doc(_uid)
       .collection('exercise_totals')
-      .doc(_today);
+      .doc(_selectedDateKey);
 
   Future<void> _logActivity() async {
     final mins = int.tryParse(_durationController.text) ?? 0;
@@ -69,9 +79,8 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
     final hr = int.tryParse(_heartRateController.text) ?? 0;
 
     if (mins == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter duration')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Please enter duration')));
       return;
     }
 
@@ -84,6 +93,7 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
         'distance_km': dist,
         'heart_rate_avg': hr,
         'notes': _notesController.text.trim(),
+        'date': _selectedDateKey,
         'created_at': FieldValue.serverTimestamp(),
       });
 
@@ -104,59 +114,72 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
       _notesController.clear();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Activity logged!'),
-            backgroundColor: AppTheme.primary,
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Activity logged for ${_displayFormat.format(_selectedDate)}!'),
+          backgroundColor: AppTheme.primary,
+        ));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content:
-                Text('Failed to log activity. Please try again.'),
-          ),
+          const SnackBar(content: Text('Failed to log activity. Please try again.')),
         );
       }
     }
   }
 
-  Future<void> _deleteEntry(String docId) async {
+  Future<void> _deleteEntry(String docId, int mins, int cals, double dist) async {
     try {
       await _exercisesCol.doc(docId).delete();
+      // Decrement totals
+      await _totalsDoc.set(
+        {
+          'total_minutes': FieldValue.increment(-mins),
+          'total_calories': FieldValue.increment(-cals),
+          'total_distance': FieldValue.increment(-dist),
+          'updated_at': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to delete entry.'),
-          ),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Failed to delete entry.')));
       }
     }
   }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2024),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) setState(() => _selectedDate = picked);
+  }
+
+  void _goToToday() => setState(() => _selectedDate = DateTime.now());
+
+  void _goToYesterday() =>
+      setState(() => _selectedDate = _selectedDate.subtract(const Duration(days: 1)));
 
   void _showActivityPicker() {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Choose Activity',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                color: AppTheme.textPrimary,
-              ),
-            ),
+            const Text('Choose Activity',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: AppTheme.textPrimary)),
             const SizedBox(height: 16),
             Wrap(
               spacing: 10,
@@ -169,39 +192,27 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
                     Navigator.pop(ctx);
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
-                    ),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     decoration: BoxDecoration(
                       color: sel ? AppTheme.primary : Colors.white,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color:
-                            sel ? AppTheme.primary : AppTheme.border,
-                      ),
+                          color: sel ? AppTheme.primary : AppTheme.border),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          a['icon'] as IconData,
-                          size: 16,
-                          color: sel
-                              ? Colors.white
-                              : AppTheme.textPrimary,
-                        ),
+                        Icon(a['icon'] as IconData,
+                            size: 16,
+                            color: sel ? Colors.white : AppTheme.textPrimary),
                         const SizedBox(width: 6),
-                        Text(
-                          a['name'] as String,
-                          style: TextStyle(
-                            color: sel
-                                ? Colors.white
-                                : AppTheme.textPrimary,
-                            fontWeight: FontWeight.w500,
-                            fontSize: 13,
-                          ),
-                        ),
+                        Text(a['name'] as String,
+                            style: TextStyle(
+                                color:
+                                    sel ? Colors.white : AppTheme.textPrimary,
+                                fontWeight: FontWeight.w500,
+                                fontSize: 13)),
                       ],
                     ),
                   ),
@@ -220,8 +231,7 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => DraggableScrollableSheet(
         expand: false,
         initialChildSize: 0.6,
@@ -236,20 +246,16 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: AppTheme.border,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
+                      color: AppTheme.border,
+                      borderRadius: BorderRadius.circular(4)),
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
-                'Exercise History',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: AppTheme.textPrimary,
-                ),
-              ),
+              const Text('Exercise History',
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: AppTheme.textPrimary)),
               const SizedBox(height: 12),
               Expanded(
                 child: StreamBuilder<QuerySnapshot>(
@@ -258,39 +264,32 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
                       .limit(50)
                       .snapshots(),
                   builder: (context, snapshot) {
-                    if (snapshot.connectionState ==
-                        ConnectionState.waiting) {
-                      return const Center(
-                        child: CircularProgressIndicator(),
-                      );
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
                     }
                     final docs = snapshot.data?.docs ?? [];
                     if (docs.isEmpty) {
-                      return const Center(
-                        child: Text('No history yet.'),
-                      );
+                      return const Center(child: Text('No history yet.'));
                     }
                     return ListView.builder(
                       controller: scrollController,
                       itemCount: docs.length,
                       itemBuilder: (context, index) {
                         final doc = docs[index];
-                        final d =
-                            doc.data() as Map<String, dynamic>;
-                        final activity =
-                            d['activity'] as String? ?? '';
-                        final dist =
-                            (d['distance_km'] as num?)?.toDouble() ??
-                                0.0;
-                        final mins =
-                            d['duration_mins'] as int? ?? 0;
-                        final cals =
-                            d['calories'] as int? ?? 0;
+                        final d = doc.data() as Map<String, dynamic>;
+                        final activity = d['activity'] as String? ?? '';
+                        final dist = (d['distance_km'] as num?)?.toDouble() ?? 0.0;
+                        final mins = d['duration_mins'] as int? ?? 0;
+                        final cals = d['calories'] as int? ?? 0;
+                        final dateStr = d['date'] as String? ?? '';
                         return _historyItem(
                           docId: doc.id,
                           activity: activity,
-                          detail:
-                              '${dist.toStringAsFixed(1)} km • $mins min • $cals kcal',
+                          detail: '${dist.toStringAsFixed(1)} km • $mins min • $cals kcal',
+                          dateLabel: dateStr,
+                          mins: mins,
+                          cals: cals,
+                          dist: dist,
                         );
                       },
                     );
@@ -317,6 +316,7 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
   @override
   Widget build(BuildContext context) {
     final goals = context.watch<GoalsProvider>();
+    final isToday = _isToday;
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -328,6 +328,12 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
+          if (!isToday)
+            IconButton(
+              icon: const Icon(Icons.today),
+              onPressed: _goToToday,
+              tooltip: 'Today',
+            ),
           IconButton(
             icon: const Icon(Icons.history),
             tooltip: 'Full History',
@@ -340,62 +346,93 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 16),
-            const Text(
-              'Quick Add',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: AppTheme.textMuted,
+            const SizedBox(height: 12),
+
+            // ── Date selector ──
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _pickDate,
+                      icon: const Icon(Icons.calendar_today, size: 16),
+                      label: Text(
+                        isToday ? 'Today' : _displayFormat.format(_selectedDate),
+                        style: const TextStyle(fontSize: 12),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: _goToYesterday,
+                    icon: const Icon(Icons.arrow_back, size: 20),
+                    tooltip: 'Previous day',
+                  ),
+                ],
               ),
             ),
+
+            if (!isToday)
+              Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryLight,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.edit_calendar, color: AppTheme.primary, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Logging for ${_displayFormat.format(_selectedDate)}',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          color: AppTheme.textPrimary),
+                    ),
+                  ],
+                ),
+              ),
+
+            const SizedBox(height: 8),
+            const Text('Quick Add',
+                style: TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w500, color: AppTheme.textMuted)),
             const SizedBox(height: 10),
             Wrap(
               spacing: 8,
               children: _quickActivities.map((a) {
                 final selected = _selectedActivity == a;
                 return GestureDetector(
-                  onTap: () =>
-                      setState(() => _selectedActivity = a),
+                  onTap: () => setState(() => _selectedActivity = a),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 9,
-                    ),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
                     decoration: BoxDecoration(
-                      color: selected
-                          ? AppTheme.primary
-                          : Colors.white,
+                      color: selected ? AppTheme.primary : Colors.white,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: selected
-                            ? AppTheme.primary
-                            : AppTheme.border,
-                      ),
+                          color: selected ? AppTheme.primary : AppTheme.border),
                     ),
-                    child: Text(
-                      a,
-                      style: TextStyle(
-                        color: selected
-                            ? Colors.white
-                            : AppTheme.textPrimary,
-                        fontWeight: FontWeight.w500,
-                        fontSize: 14,
-                      ),
-                    ),
+                    child: Text(a,
+                        style: TextStyle(
+                            color: selected ? Colors.white : AppTheme.textPrimary,
+                            fontWeight: FontWeight.w500,
+                            fontSize: 14)),
                   ),
                 );
               }).toList(),
             ),
             const SizedBox(height: 24),
-            const Text(
-              'Details',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: AppTheme.textMuted,
-              ),
-            ),
+            const Text('Details',
+                style: TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w500, color: AppTheme.textMuted)),
             const SizedBox(height: 10),
             Container(
               padding: const EdgeInsets.all(16),
@@ -408,57 +445,39 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    mainAxisAlignment:
-                        MainAxisAlignment.spaceBetween,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            _selectedActivity,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16,
-                              color: AppTheme.textPrimary,
-                            ),
-                          ),
-                          const Text(
-                            'Type of exercise',
-                            style: TextStyle(
-                              color: AppTheme.textMuted,
-                              fontSize: 12,
-                            ),
-                          ),
+                          Text(_selectedActivity,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                  color: AppTheme.textPrimary)),
+                          const Text('Type of exercise',
+                              style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
                         ],
                       ),
                       GestureDetector(
                         onTap: _showActivityPicker,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 7,
-                          ),
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                           decoration: BoxDecoration(
                             color: AppTheme.primaryLight,
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: const Row(
                             children: [
-                              Icon(
-                                Icons.edit_outlined,
-                                color: AppTheme.primary,
-                                size: 14,
-                              ),
+                              Icon(Icons.edit_outlined,
+                                  color: AppTheme.primary, size: 14),
                               SizedBox(width: 4),
-                              Text(
-                                'Select',
-                                style: TextStyle(
-                                  color: AppTheme.primary,
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 13,
-                                ),
-                              ),
+                              Text('Select',
+                                  style: TextStyle(
+                                      color: AppTheme.primary,
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: 13)),
                             ],
                           ),
                         ),
@@ -475,10 +494,7 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
                           textInputAction: TextInputAction.next,
                           decoration: const InputDecoration(
                             hintText: 'Duration (min)',
-                            hintStyle: TextStyle(
-                              color: AppTheme.textMuted,
-                              fontSize: 13,
-                            ),
+                            hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 13),
                           ),
                         ),
                       ),
@@ -490,10 +506,7 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
                           textInputAction: TextInputAction.next,
                           decoration: const InputDecoration(
                             hintText: 'Calories (kcal)',
-                            hintStyle: TextStyle(
-                              color: AppTheme.textMuted,
-                              fontSize: 13,
-                            ),
+                            hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 13),
                           ),
                         ),
                       ),
@@ -509,10 +522,7 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
                           textInputAction: TextInputAction.next,
                           decoration: const InputDecoration(
                             hintText: 'Distance (km)',
-                            hintStyle: TextStyle(
-                              color: AppTheme.textMuted,
-                              fontSize: 13,
-                            ),
+                            hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 13),
                           ),
                         ),
                       ),
@@ -524,10 +534,7 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
                           textInputAction: TextInputAction.next,
                           decoration: const InputDecoration(
                             hintText: 'Heart Rate (avg)',
-                            hintStyle: TextStyle(
-                              color: AppTheme.textMuted,
-                              fontSize: 13,
-                            ),
+                            hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 13),
                           ),
                         ),
                       ),
@@ -535,61 +542,38 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
                   ),
                   const SizedBox(height: 16),
                   Row(
-                    mainAxisAlignment:
-                        MainAxisAlignment.spaceBetween,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Intensity',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.textPrimary,
-                            ),
-                          ),
-                          Text(
-                            'How hard was it?',
-                            style: TextStyle(
-                              color: AppTheme.textMuted,
-                              fontSize: 12,
-                            ),
-                          ),
+                          Text('Intensity',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.textPrimary)),
+                          Text('How hard was it?',
+                              style:
+                                  TextStyle(color: AppTheme.textMuted, fontSize: 12)),
                         ],
                       ),
                       Row(
                         children: _intensities.map((i) {
                           final sel = _selectedIntensity == i;
                           return GestureDetector(
-                            onTap: () => setState(
-                              () => _selectedIntensity = i,
-                            ),
+                            onTap: () => setState(() => _selectedIntensity = i),
                             child: Container(
-                              margin:
-                                  const EdgeInsets.only(left: 6),
-                              padding:
-                                  const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
+                              margin: const EdgeInsets.only(left: 6),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
-                                color: sel
-                                    ? AppTheme.primary
-                                    : AppTheme.primaryLight,
-                                borderRadius:
-                                    BorderRadius.circular(16),
+                                color: sel ? AppTheme.primary : AppTheme.primaryLight,
+                                borderRadius: BorderRadius.circular(16),
                               ),
-                              child: Text(
-                                i,
-                                style: TextStyle(
-                                  color: sel
-                                      ? Colors.white
-                                      : AppTheme.primary,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
+                              child: Text(i,
+                                  style: TextStyle(
+                                      color: sel ? Colors.white : AppTheme.primary,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500)),
                             ),
                           );
                         }).toList(),
@@ -602,8 +586,7 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
                     maxLines: 3,
                     decoration: const InputDecoration(
                       hintText: 'Notes',
-                      hintStyle:
-                          TextStyle(color: AppTheme.textMuted),
+                      hintStyle: TextStyle(color: AppTheme.textMuted),
                     ),
                   ),
                 ],
@@ -619,50 +602,32 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            const Text(
-              "Today's Progress",
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: AppTheme.textMuted,
-              ),
+
+            // ── Daily Progress ──
+            Text(
+              isToday ? "Today's Progress" : "${_displayFormat.format(_selectedDate)} Progress",
+              style: const TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w500, color: AppTheme.textMuted),
             ),
             const SizedBox(height: 10),
             StreamBuilder<DocumentSnapshot>(
               stream: _totalsDoc.snapshots(),
               builder: (context, snapshot) {
-                if (snapshot.connectionState ==
-                    ConnectionState.waiting) {
-                  return const Center(
-                    child: CircularProgressIndicator(),
-                  );
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
                 }
-                if (snapshot.hasError) {
-                  return const Center(
-                    child: Text('Error loading progress.'),
-                  );
-                }
-                final data = snapshot.data?.data()
-                    as Map<String, dynamic>?;
-                final totalMins =
-                    data?['total_minutes'] as int? ?? 0;
-                final totalCals =
-                    data?['total_calories'] as int? ?? 0;
+                final data = snapshot.data?.data() as Map<String, dynamic>?;
+                final totalMins = data?['total_minutes'] as int? ?? 0;
+                final totalCals = data?['total_calories'] as int? ?? 0;
                 final totalDist =
-                    (data?['total_distance'] as num?)
-                            ?.toDouble() ??
-                        0.0;
+                    (data?['total_distance'] as num?)?.toDouble() ?? 0.0;
 
-                final goalMinutes = goals.exerciseGoalMin <= 0
-                    ? 30
-                    : goals.exerciseGoalMin;
-                final progress = (totalMins / goalMinutes)
-                    .clamp(0.0, 1.0);
+                final goalMinutes = goals.exerciseGoalMin <= 0 ? 30 : goals.exerciseGoalMin;
+                final progress = (totalMins / goalMinutes).clamp(0.0, 1.0);
                 final reached = progress >= 1.0;
 
                 return Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
@@ -670,78 +635,33 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
                         value: progress,
                         minHeight: 8,
                         backgroundColor: AppTheme.primaryLight,
-                        color:
-                            reached ? Colors.green : AppTheme.primary,
+                        color: reached ? Colors.green : AppTheme.primary,
                       ),
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      '$totalMins / $goalMinutes min • '
-                      '${(progress * 100).toInt()}%',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.textMuted,
-                      ),
+                      '$totalMins / $goalMinutes min • ${(progress * 100).toInt()}%',
+                      style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      reached
-                          ? 'Exercise goal reached! 🎉'
-                          : 'You can still add some movement today',
+                      reached ? 'Exercise goal reached! 🎉' : 'Keep going!',
                       style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: reached
-                            ? Colors.green
-                            : AppTheme.textMuted,
-                      ),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: reached ? Colors.green : AppTheme.textMuted),
                     ),
                     const SizedBox(height: 10),
-                    if (totalMins == 0 &&
-                        totalCals == 0 &&
-                        totalDist == 0.0) ...[
-                      const SizedBox(height: 8),
-                      const Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.fitness_center_outlined,
-                              size: 40,
-                              color: AppTheme.textMuted,
-                            ),
-                            SizedBox(height: 8),
-                            Text(
-                              'No exercise logged yet today.\nLog your first activity above.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: AppTheme.textMuted,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ] else
+                    if (totalMins > 0 || totalCals > 0 || totalDist > 0.0)
                       Row(
                         children: [
-                          _progressChip(
-                            Icons.timer_outlined,
-                            '$totalMins min',
-                            'Duration',
-                          ),
+                          _progressChip(Icons.timer_outlined, '$totalMins min', 'Duration'),
                           const SizedBox(width: 10),
-                          _progressChip(
-                            Icons.local_fire_department_outlined,
-                            '$totalCals kcal',
-                            'Calories',
-                          ),
+                          _progressChip(Icons.local_fire_department_outlined,
+                              '$totalCals kcal', 'Calories'),
                           const SizedBox(width: 10),
-                          _progressChip(
-                            Icons.map_outlined,
-                            '${totalDist.toStringAsFixed(1)} km',
-                            'Distance',
-                          ),
+                          _progressChip(Icons.map_outlined,
+                              '${totalDist.toStringAsFixed(1)} km', 'Distance'),
                         ],
                       ),
                   ],
@@ -749,52 +669,37 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
               },
             ),
             const SizedBox(height: 24),
-            const Text(
-              'Recent History',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: AppTheme.textMuted,
-              ),
-            ),
+
+            // ── Recent entries for selected date ──
+            const Text('Entries',
+                style: TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w500, color: AppTheme.textMuted)),
             const SizedBox(height: 10),
             StreamBuilder<QuerySnapshot>(
               stream: _exercisesCol
+                  .where('date', isEqualTo: _selectedDateKey)
                   .orderBy('created_at', descending: true)
-                  .limit(5)
                   .snapshots(),
               builder: (context, snapshot) {
-                if (snapshot.connectionState ==
-                    ConnectionState.waiting) {
-                  return const Center(
-                    child: CircularProgressIndicator(),
-                  );
-                }
-                if (snapshot.hasError) {
-                  return const Center(
-                    child: Text('Error loading history.'),
-                  );
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
                 }
                 final docs = snapshot.data?.docs ?? [];
                 if (docs.isEmpty) {
-                  return const Center(
+                  return Center(
                     child: Padding(
-                      padding:
-                          EdgeInsets.symmetric(vertical: 16),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
-                            Icons.fitness_center_outlined,
-                            size: 40,
-                            color: AppTheme.textMuted,
-                          ),
-                          SizedBox(height: 8),
+                          const Icon(Icons.fitness_center_outlined,
+                              size: 40, color: AppTheme.textMuted),
+                          const SizedBox(height: 8),
                           Text(
-                            'No activities logged yet.',
-                            style: TextStyle(
-                              color: AppTheme.textMuted,
-                            ),
+                            'No activities logged for ${isToday ? "today" : _displayFormat.format(_selectedDate)}.',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                                fontSize: 13, color: AppTheme.textMuted),
                           ),
                         ],
                       ),
@@ -803,23 +708,19 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
                 }
                 return Column(
                   children: docs.map((doc) {
-                    final d =
-                        doc.data() as Map<String, dynamic>;
-                    final activity =
-                        d['activity'] as String? ?? '';
-                    final dist =
-                        (d['distance_km'] as num?)
-                                ?.toDouble() ??
-                            0.0;
-                    final mins =
-                        d['duration_mins'] as int? ?? 0;
-                    final cals =
-                        d['calories'] as int? ?? 0;
+                    final d = doc.data() as Map<String, dynamic>;
+                    final activity = d['activity'] as String? ?? '';
+                    final dist = (d['distance_km'] as num?)?.toDouble() ?? 0.0;
+                    final mins = d['duration_mins'] as int? ?? 0;
+                    final cals = d['calories'] as int? ?? 0;
                     return _historyItem(
                       docId: doc.id,
                       activity: activity,
-                      detail:
-                          '${dist.toStringAsFixed(1)} km • $mins min • $cals kcal',
+                      detail: '${dist.toStringAsFixed(1)} km • $mins min • $cals kcal',
+                      dateLabel: '',
+                      mins: mins,
+                      cals: cals,
+                      dist: dist,
                     );
                   }).toList(),
                 );
@@ -832,11 +733,7 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
     );
   }
 
-  Widget _progressChip(
-    IconData icon,
-    String value,
-    String label,
-  ) {
+  Widget _progressChip(IconData icon, String value, String label) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 14),
@@ -849,21 +746,13 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
           children: [
             Icon(icon, color: AppTheme.primary, size: 22),
             const SizedBox(height: 6),
-            Text(
-              value,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 15,
-                color: AppTheme.textPrimary,
-              ),
-            ),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppTheme.textMuted,
-              ),
-            ),
+            Text(value,
+                style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color: AppTheme.textPrimary)),
+            Text(label,
+                style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
           ],
         ),
       ),
@@ -874,13 +763,14 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
     required String docId,
     required String activity,
     required String detail,
+    required String dateLabel,
+    required int mins,
+    required int cals,
+    required double dist,
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: 12,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -894,43 +784,31 @@ class _ExerciseTrackerScreenState extends State<ExerciseTrackerScreen> {
               color: AppTheme.primaryLight,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(
-              Icons.fitness_center_outlined,
-              color: AppTheme.primary,
-              size: 18,
-            ),
+            child: const Icon(Icons.fitness_center_outlined,
+                color: AppTheme.primary, size: 18),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  activity,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
-                Text(
-                  detail,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.textMuted,
-                  ),
-                ),
+                Text(activity,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: AppTheme.textPrimary)),
+                Text(detail,
+                    style:
+                        const TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                if (dateLabel.isNotEmpty)
+                  Text(dateLabel,
+                      style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
               ],
             ),
           ),
           IconButton(
-            icon: const Icon(
-              Icons.delete_outline,
-              color: Colors.red,
-              size: 18,
-            ),
-            onPressed: () => _deleteEntry(docId),
+            icon: const Icon(Icons.delete_outline, color: Colors.red, size: 18),
+            onPressed: () => _deleteEntry(docId, mins, cals, dist),
           ),
         ],
       ),
