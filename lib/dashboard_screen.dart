@@ -12,6 +12,9 @@ import 'exercise_tracker_screen.dart';
 import 'medication_tracker_screen.dart';
 import 'goal_provider.dart';
 import 'profile_provider.dart';
+import 'weight_tracker_screen.dart';
+import 'step_tracker_screen.dart';
+import 'bmi_tracker_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -147,7 +150,7 @@ class DashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final goals = context.watch<GoalsProvider>();
-    final profile = context.watch<ProfileProvider>();     // ← NEW
+    final profile = context.watch<ProfileProvider>();
 
     final name = profile.displayName?.trim().isNotEmpty == true
         ? profile.displayName!.split(' ').first
@@ -284,6 +287,8 @@ class DashboardScreen extends StatelessWidget {
             const SizedBox(height: 24),
 
             // ── Tracker navigation cards ───────────────────────────
+            
+            // Water Tracker
             _sectionHeader('💧 Water', 'Today'),
             const SizedBox(height: 10),
             _trackerCard(context,
@@ -295,6 +300,41 @@ class DashboardScreen extends StatelessWidget {
                     MaterialPageRoute(
                         builder: (_) => const WaterTrackerScreen()))),
             const SizedBox(height: 20),
+
+            // ── Weight History ───────────────────────────────────
+            _sectionHeader('⚖️ Weight', 'History'),
+            const SizedBox(height: 10),
+            _trackerCard(context,
+                icon: Icons.monitor_weight_outlined,
+                title: 'Weight Tracker',
+                subtitle: 'Track your weight over time',
+                onTap: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const WeightTrackerScreen()))),
+            const SizedBox(height: 20),
+
+            // ── Steps ─────────────────────────────────────────────
+            _sectionHeader('👟 Steps', 'Today'),
+            const SizedBox(height: 10),
+            _trackerCard(context,
+                icon: Icons.directions_walk_outlined,
+                title: 'Step Tracker',
+                subtitle: 'Daily steps, streaks & trends',
+                onTap: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const StepTrackerScreen()))),
+            const SizedBox(height: 20),
+
+            // ── BMI Trend ─────────────────────────────────────────
+            _sectionHeader('📊 BMI', 'Trend'),
+            const SizedBox(height: 10),
+            _trackerCard(context,
+                icon: Icons.calculate_outlined,
+                title: 'BMI Trend',
+                subtitle: 'Historical BMI with insights',
+                onTap: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const BmiTrackerScreen()))),
+            const SizedBox(height: 20),
+
+            // Meal Tracker
             _sectionHeader('🍽 Meals', 'Today'),
             const SizedBox(height: 10),
             _trackerCard(context,
@@ -306,6 +346,8 @@ class DashboardScreen extends StatelessWidget {
                     MaterialPageRoute(
                         builder: (_) => const MealTrackerScreen()))),
             const SizedBox(height: 20),
+
+            // Exercise Tracker
             _sectionHeader('🏃 Exercise', 'Today'),
             const SizedBox(height: 10),
             _trackerCard(context,
@@ -329,6 +371,8 @@ class DashboardScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
+
+            // Medication Tracker
             _sectionHeader('💊 Medication', 'Today'),
             const SizedBox(height: 10),
             _trackerCard(context,
@@ -461,8 +505,8 @@ class _ProfileSummaryCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: AppTheme.primary.withOpacity(0.25)),
           ),
-          child: Row(
-            children: const [
+          child: const Row(
+            children: [
               Icon(Icons.person_outline, color: AppTheme.primary, size: 20),
               SizedBox(width: 10),
               Expanded(

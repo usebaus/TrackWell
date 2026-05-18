@@ -468,7 +468,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     color: AppTheme.textPrimary)),
                             const SizedBox(height: 8),
                             DropdownButtonFormField<String>(
-                              value: _selectedGender,
+                              initialValue: _selectedGender,
                               hint: const Text('Select gender'),
                               decoration: const InputDecoration(
                                 prefixIcon: Icon(Icons.wc_outlined,

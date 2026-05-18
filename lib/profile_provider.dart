@@ -4,9 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-/// Stores and streams the user's personal health profile.
-///
-/// Firestore path: users/{uid}/profile/health_info
 class ProfileProvider extends ChangeNotifier {
   ProfileProvider({
     FirebaseAuth? auth,
@@ -23,13 +20,15 @@ class ProfileProvider extends ChangeNotifier {
   late final StreamSubscription<User?> _authSub;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _profileSub;
 
+  bool _disposed = false;
+
   // ── State ──────────────────────────────────────────────
   bool loading = true;
   String? errorMessage;
 
   String? displayName;
   int? age;
-  String? gender; // 'male' | 'female' | 'other'
+  String? gender;
   int? heightCm;
   double? weightKg;
   double? targetWeightKg;
@@ -68,16 +67,17 @@ class ProfileProvider extends ChangeNotifier {
     if (user == null) {
       _reset();
       loading = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
       return;
     }
 
     loading = true;
     errorMessage = null;
-    notifyListeners();
+    if (!_disposed) notifyListeners();
 
     _profileSub = _docRefFor(user)!.snapshots().listen(
       (doc) {
+        if (_disposed) return;
         final d = doc.data();
         displayName = d?['displayName'] as String?;
         age = d?['age'] as int?;
@@ -90,6 +90,7 @@ class ProfileProvider extends ChangeNotifier {
         notifyListeners();
       },
       onError: (e) {
+        if (_disposed) return;
         loading = false;
         errorMessage = 'Failed to load profile';
         notifyListeners();
@@ -127,12 +128,10 @@ class ProfileProvider extends ChangeNotifier {
     if (gender != null) data['gender'] = gender;
     if (heightCm != null) data['heightCm'] = heightCm;
     if (weightKg != null) data['weightKg'] = weightKg;
-    // Allow null to clear targetWeight
     data['targetWeightKg'] = targetWeightKg;
 
     await _docRefFor(user)!.set(data, SetOptions(merge: true));
 
-    // Also sync displayName to Firebase Auth if provided
     if (displayName != null && displayName.isNotEmpty) {
       await user.updateDisplayName(displayName);
     }
@@ -140,6 +139,7 @@ class ProfileProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _profileSub?.cancel();
     _authSub.cancel();
     super.dispose();
@@ -182,15 +182,15 @@ extension BmiCategoryExtension on BmiCategory {
   Color get color {
     switch (this) {
       case BmiCategory.underweight:
-        return const Color(0xFF006494); // blue
+        return const Color(0xFF006494);
       case BmiCategory.normal:
-        return const Color(0xFF437a22); // green
+        return const Color(0xFF437a22);
       case BmiCategory.overweight:
-        return const Color(0xFFda7101); // orange
+        return const Color(0xFFda7101);
       case BmiCategory.obese:
-        return const Color(0xFFa12c7b); // red-ish
+        return const Color(0xFFa12c7b);
       case BmiCategory.unknown:
-        return const Color(0xFF7a7974); // muted
+        return const Color(0xFF7a7974);
     }
   }
 }

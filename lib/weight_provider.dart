@@ -4,7 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-/// A single weight entry persisted to Firestore.
 class WeightEntry {
   const WeightEntry({
     required this.id,
@@ -43,7 +42,6 @@ class WeightEntry {
       );
 }
 
-/// Range filter for graph display.
 enum WeightRange { sevenDays, thirtyDays, ninetyDays, allTime }
 
 extension WeightRangeLabel on WeightRange {
@@ -75,9 +73,6 @@ extension WeightRangeLabel on WeightRange {
   }
 }
 
-/// Manages historical weight entries via Firestore.
-///
-/// Firestore path: users/{uid}/weight_entries/{docId}
 class WeightProvider extends ChangeNotifier {
   WeightProvider({
     FirebaseAuth? auth,
@@ -94,13 +89,12 @@ class WeightProvider extends ChangeNotifier {
   late final StreamSubscription<User?> _authSub;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _entriesSub;
 
-  // ── State ────────────────────────────────────────────
+  bool _disposed = false;
   bool loading = true;
   String? errorMessage;
   List<WeightEntry> _entries = [];
   WeightRange selectedRange = WeightRange.thirtyDays;
 
-  // ── Getters ──────────────────────────────────────────
   List<WeightEntry> get allEntries => List.unmodifiable(_entries);
 
   List<WeightEntry> get filteredEntries {
@@ -111,19 +105,15 @@ class WeightProvider extends ChangeNotifier {
         .toList();
   }
 
-  WeightEntry? get latestEntry =>
-      _entries.isEmpty ? null : _entries.first;
-
+  WeightEntry? get latestEntry => _entries.isEmpty ? null : _entries.first;
   double? get latestWeightKg => latestEntry?.weightKg;
 
-  /// Net change over selected range (positive = gained, negative = lost).
   double? get rangeChange {
     final filtered = filteredEntries;
     if (filtered.length < 2) return null;
     return filtered.first.weightKg - filtered.last.weightKg;
   }
 
-  /// Average weekly change over selected range.
   double? get weeklyChange {
     final filtered = filteredEntries;
     if (filtered.length < 2) return null;
@@ -135,7 +125,6 @@ class WeightProvider extends ChangeNotifier {
     return totalChange / (days / 7.0);
   }
 
-  /// Average monthly change over all-time entries.
   double? get monthlyChange {
     if (_entries.length < 2) return null;
     final days =
@@ -145,7 +134,6 @@ class WeightProvider extends ChangeNotifier {
     return totalChange / (days / 30.0);
   }
 
-  /// Human-readable insight string.
   String get insightText {
     final rc = rangeChange;
     if (rc == null) return 'Log more entries to see trends.';
@@ -158,7 +146,7 @@ class WeightProvider extends ChangeNotifier {
             : selectedRange == WeightRange.ninetyDays
                 ? 'the last 3 months'
                 : 'all time';
-    return 'You $direction ${absKg} kg in $period.';
+    return 'You $direction $absKg kg in $period.';
   }
 
   String get weeklyInsightText {
@@ -166,17 +154,15 @@ class WeightProvider extends ChangeNotifier {
     if (wc == null) return '';
     final absKg = wc.abs().toStringAsFixed(2);
     final direction = wc < 0 ? 'losing' : 'gaining';
-    return 'Average weekly change: $direction ${absKg} kg/week.';
+    return 'Average weekly change: $direction $absKg kg/week.';
   }
 
-  // ── Firestore helpers ────────────────────────────────
   CollectionReference<Map<String, dynamic>>? _colRef(User user) =>
       _firestore
           .collection('users')
           .doc(user.uid)
           .collection('weight_entries');
 
-  // ── Auth listener ────────────────────────────────────
   void _onUserChanged(User? user) {
     _entriesSub?.cancel();
     _entriesSub = null;
@@ -184,26 +170,28 @@ class WeightProvider extends ChangeNotifier {
 
     if (user == null) {
       loading = false;
-      notifyListeners();
+      errorMessage = null;
+      if (!_disposed) notifyListeners();
       return;
     }
 
     loading = true;
-    notifyListeners();
+    errorMessage = null;
+    if (!_disposed) notifyListeners();
 
     _entriesSub = _colRef(user)!
         .orderBy('timestamp', descending: true)
         .snapshots()
         .listen(
       (snap) {
-        _entries = snap.docs
-            .map((d) => WeightEntry.fromDoc(d))
-            .toList();
+        if (_disposed) return;
+        _entries = snap.docs.map((d) => WeightEntry.fromDoc(d)).toList();
         loading = false;
         errorMessage = null;
         notifyListeners();
       },
       onError: (e) {
+        if (_disposed) return;
         loading = false;
         errorMessage = 'Failed to load weight history.';
         notifyListeners();
@@ -211,7 +199,6 @@ class WeightProvider extends ChangeNotifier {
     );
   }
 
-  // ── CRUD ─────────────────────────────────────────────
   Future<void> addEntry(double weightKg, {String? note}) async {
     final user = _auth.currentUser;
     if (user == null) return;
@@ -241,11 +228,9 @@ class WeightProvider extends ChangeNotifier {
 
   void setRange(WeightRange range) {
     selectedRange = range;
-    notifyListeners();
+    if (!_disposed) notifyListeners();
   }
 
-  /// Seeds realistic demo data for the last 90 days so graphs look
-  /// meaningful immediately after install. Only seeds if no entries exist.
   Future<void> seedDemoDataIfEmpty() async {
     final user = _auth.currentUser;
     if (user == null) return;
@@ -257,7 +242,6 @@ class WeightProvider extends ChangeNotifier {
     final col = _colRef(user)!;
 
     for (int i = 90; i >= 0; i -= 3) {
-      // Slight downward trend with natural variance
       weight += (-0.15 + (i % 7 == 0 ? 0.3 : -0.05));
       weight = weight.clamp(70.0, 95.0);
       final ts = now.subtract(Duration(days: i));
@@ -270,10 +254,12 @@ class WeightProvider extends ChangeNotifier {
       });
     }
     await batch.commit();
+    // ✅ Firestore stream auto-updates — no manual _onUserChanged needed
   }
 
   @override
   void dispose() {
+    _disposed = true;
     _entriesSub?.cancel();
     _authSub.cancel();
     super.dispose();

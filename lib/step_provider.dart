@@ -5,10 +5,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-/// A single day's step count.
 class StepEntry {
   const StepEntry({
-    required this.date, // 'YYYY-MM-DD'
+    required this.date,
     required this.steps,
   });
 
@@ -24,9 +23,6 @@ class StepEntry {
   }
 }
 
-/// Manages daily step counts via Firestore.
-///
-/// Firestore path: users/{uid}/step_logs/{YYYY-MM-DD}
 class StepProvider extends ChangeNotifier {
   StepProvider({
     FirebaseAuth? auth,
@@ -43,20 +39,17 @@ class StepProvider extends ChangeNotifier {
   late final StreamSubscription<User?> _authSub;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _stepsSub;
 
-  // ── State ────────────────────────────────────────────
+  bool _disposed = false;
   bool loading = true;
   String? errorMessage;
-  final Map<String, int> _stepMap = {}; // date -> steps
+  final Map<String, int> _stepMap = {};
 
   static String _fmt(DateTime d) =>
       '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
-  // ── Getters ──────────────────────────────────────────
   int get todaySteps => _stepMap[_fmt(DateTime.now())] ?? 0;
-
   int get dailyGoal => 10000;
 
-  /// Returns steps for the last [days] days, oldest first.
   List<StepEntry> entriesForDays(int days) {
     final now = DateTime.now();
     final result = <StepEntry>[];
@@ -92,12 +85,10 @@ class StepProvider extends ChangeNotifier {
 
   String get highestStepDate {
     if (_stepMap.isEmpty) return '—';
-    final entry = _stepMap.entries.reduce(
-        (a, b) => a.value >= b.value ? a : b);
+    final entry = _stepMap.entries.reduce((a, b) => a.value >= b.value ? a : b);
     return entry.key;
   }
 
-  /// Number of consecutive days (ending today) with >= 5000 steps.
   int get currentStreak {
     int streak = 0;
     final now = DateTime.now();
@@ -123,7 +114,6 @@ class StepProvider extends ChangeNotifier {
     return 'Average ${avg.toInt()} steps/day. Add $deficit more to hit your goal!';
   }
 
-  // ── Firestore ───────────────────────────────────────
   CollectionReference<Map<String, dynamic>>? _colRef(User user) =>
       _firestore
           .collection('users')
@@ -137,21 +127,22 @@ class StepProvider extends ChangeNotifier {
 
     if (user == null) {
       loading = false;
-      notifyListeners();
+      errorMessage = null;
+      if (!_disposed) notifyListeners();
       return;
     }
 
     loading = true;
-    notifyListeners();
+    errorMessage = null;
+    if (!_disposed) notifyListeners();
 
-    // Load last 90 days only for performance
     final cutoff = DateTime.now().subtract(const Duration(days: 90));
     _stepsSub = _colRef(user)!
-        .where(FieldPath.documentId,
-            isGreaterThanOrEqualTo: _fmt(cutoff))
+        .where(FieldPath.documentId, isGreaterThanOrEqualTo: _fmt(cutoff))
         .snapshots()
         .listen(
       (snap) {
+        if (_disposed) return;
         _stepMap.clear();
         for (final doc in snap.docs) {
           final steps = (doc.data()['steps'] as num?)?.toInt() ?? 0;
@@ -162,6 +153,7 @@ class StepProvider extends ChangeNotifier {
         notifyListeners();
       },
       onError: (e) {
+        if (_disposed) return;
         loading = false;
         errorMessage = 'Failed to load step data.';
         notifyListeners();
@@ -185,15 +177,11 @@ class StepProvider extends ChangeNotifier {
     final key = _fmt(DateTime.now());
     final current = _stepMap[key] ?? 0;
     await _colRef(user)!.doc(key).set(
-      {
-        'steps': current + delta,
-        'updated_at': FieldValue.serverTimestamp()
-      },
+      {'steps': current + delta, 'updated_at': FieldValue.serverTimestamp()},
       SetOptions(merge: true),
     );
   }
 
-  /// Seeds realistic demo step data for 90 days. Only runs if no data exists.
   Future<void> seedDemoDataIfEmpty() async {
     final user = _auth.currentUser;
     if (user == null) return;
@@ -207,10 +195,9 @@ class StepProvider extends ChangeNotifier {
     for (int i = 89; i >= 0; i--) {
       final d = now.subtract(Duration(days: i));
       final key = _fmt(d);
-      // Realistic distribution: mostly 7k-12k with some rest days
       final steps = rng.nextInt(3) == 0
-          ? 1500 + rng.nextInt(3000) // rest day
-          : 7000 + rng.nextInt(5000); // active day
+          ? 1500 + rng.nextInt(3000)
+          : 7000 + rng.nextInt(5000);
       batch.set(col.doc(key), {
         'steps': steps,
         'updated_at': Timestamp.fromDate(
@@ -218,10 +205,12 @@ class StepProvider extends ChangeNotifier {
       });
     }
     await batch.commit();
+    // ✅ Firestore stream auto-updates — no manual _onUserChanged needed
   }
 
   @override
   void dispose() {
+    _disposed = true;
     _stepsSub?.cancel();
     _authSub.cancel();
     super.dispose();

@@ -7,10 +7,12 @@ import 'package:trackwell/firebase_options.dart';
 import 'package:trackwell/app_theme.dart';
 import 'package:trackwell/login_screen.dart';
 import 'package:trackwell/signup_screen.dart';
-import 'package:trackwell/dashboard_screen.dart';
+import 'package:trackwell/main_shell.dart';
 import 'package:trackwell/settings_screen.dart';
 import 'package:trackwell/goal_provider.dart';
 import 'package:trackwell/profile_provider.dart';
+import 'package:trackwell/step_provider.dart';
+import 'package:trackwell/weight_provider.dart';
 import 'package:trackwell/notification_service.dart';
 
 void main() async {
@@ -30,7 +32,9 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => GoalsProvider()),
-        ChangeNotifierProvider(create: (_) => ProfileProvider()),  // ← NEW
+        ChangeNotifierProvider(create: (_) => ProfileProvider()),
+        ChangeNotifierProvider(create: (_) => StepProvider()),
+        ChangeNotifierProvider(create: (_) => WeightProvider()),
       ],
       child: MaterialApp(
         title: 'TrackWell',
@@ -40,7 +44,7 @@ class MyApp extends StatelessWidget {
         routes: {
           '/login': (context) => const LoginScreen(),
           '/signup': (context) => const SignupScreen(),
-          '/home': (context) => const DashboardScreen(),
+          '/home': (context) => const MainShell(),
           '/settings': (context) => const SettingsScreen(),
         },
       ),
@@ -61,7 +65,7 @@ class _AuthGate extends StatelessWidget {
             body: Center(child: CircularProgressIndicator()),
           );
         }
-        if (snapshot.hasData) return const DashboardScreen();
+        if (snapshot.hasData) return const MainShell();
         return const LoginScreen();
       },
     );

@@ -4,14 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-/// Central place for user goals (water + exercise) and reminder times.
-///
-/// Data source:
-/// users/{uid}/profile/preferences
-///   - daily_water_goal_ml (int, default 2000)
-///   - daily_exercise_goal_min (int, default 30)
-///   - water_reminder_time (String 'HH:mm' or null)
-///   - exercise_reminder_time (String 'HH:mm' or null)
 class GoalsProvider extends ChangeNotifier {
   GoalsProvider({
     FirebaseAuth? auth,
@@ -28,6 +20,8 @@ class GoalsProvider extends ChangeNotifier {
   late final StreamSubscription<User?> _authSub;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _prefsSub;
 
+  bool _disposed = false;
+
   bool loading = true;
   String? errorMessage;
 
@@ -37,13 +31,12 @@ class GoalsProvider extends ChangeNotifier {
   TimeOfDay? waterReminderTime;
   TimeOfDay? exerciseReminderTime;
 
-  DocumentReference<Map<String, dynamic>>? _prefsRefFor(User user) {
-    return _firestore
-        .collection('users')
-        .doc(user.uid)
-        .collection('profile')
-        .doc('preferences');
-  }
+  DocumentReference<Map<String, dynamic>>? _prefsRefFor(User user) =>
+      _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('profile')
+          .doc('preferences');
 
   void _onUserChanged(User? user) {
     _prefsSub?.cancel();
@@ -52,35 +45,30 @@ class GoalsProvider extends ChangeNotifier {
     if (user == null) {
       loading = false;
       errorMessage = null;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
       return;
     }
 
     loading = true;
     errorMessage = null;
-    notifyListeners();
+    if (!_disposed) notifyListeners();
 
-    final prefsRef = _prefsRefFor(user)!;
-    _prefsSub = prefsRef.snapshots().listen(
+    _prefsSub = _prefsRefFor(user)!.snapshots().listen(
       (doc) {
+        if (_disposed) return;
         final data = doc.data();
         waterGoalMl = (data?['daily_water_goal_ml'] as int?) ?? 2000;
-        exerciseGoalMin =
-            (data?['daily_exercise_goal_min'] as int?) ?? 30;
-
-        final waterTimeStr =
-            data?['water_reminder_time'] as String?;
-        final exerciseTimeStr =
-            data?['exercise_reminder_time'] as String?;
-
-        waterReminderTime = _parseTimeOfDay(waterTimeStr);
-        exerciseReminderTime = _parseTimeOfDay(exerciseTimeStr);
-
+        exerciseGoalMin = (data?['daily_exercise_goal_min'] as int?) ?? 30;
+        waterReminderTime = _parseTimeOfDay(
+            data?['water_reminder_time'] as String?);
+        exerciseReminderTime = _parseTimeOfDay(
+            data?['exercise_reminder_time'] as String?);
         loading = false;
         errorMessage = null;
         notifyListeners();
       },
       onError: (e) {
+        if (_disposed) return;
         loading = false;
         errorMessage = 'Failed to load goals';
         notifyListeners();
@@ -94,10 +82,7 @@ class GoalsProvider extends ChangeNotifier {
   }) async {
     final user = _auth.currentUser;
     if (user == null) return;
-
-    final prefsRef = _prefsRefFor(user)!;
-
-    await prefsRef.set(
+    await _prefsRefFor(user)!.set(
       {
         'daily_water_goal_ml': waterGoalMlNew,
         'daily_exercise_goal_min': exerciseGoalMinNew,
@@ -113,10 +98,7 @@ class GoalsProvider extends ChangeNotifier {
   }) async {
     final user = _auth.currentUser;
     if (user == null) return;
-
-    final prefsRef = _prefsRefFor(user)!;
-
-    await prefsRef.set(
+    await _prefsRefFor(user)!.set(
       {
         'water_reminder_time':
             waterTime != null ? _formatTimeOfDay(waterTime) : null,
@@ -129,8 +111,8 @@ class GoalsProvider extends ChangeNotifier {
   }
 
   String _formatTimeOfDay(TimeOfDay time) {
-    String twoDigits(int v) => v.toString().padLeft(2, '0');
-    return '${twoDigits(time.hour)}:${twoDigits(time.minute)}';
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${two(time.hour)}:${two(time.minute)}';
   }
 
   TimeOfDay? _parseTimeOfDay(String? value) {
@@ -145,6 +127,7 @@ class GoalsProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _prefsSub?.cancel();
     _authSub.cancel();
     super.dispose();
